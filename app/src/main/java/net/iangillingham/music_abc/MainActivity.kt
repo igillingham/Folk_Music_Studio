@@ -1,5 +1,6 @@
 package net.iangillingham.music_abc
 
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,22 +10,40 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -33,10 +52,21 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.documentfile.provider.DocumentFile
 import net.iangillingham.music_abc.ui.theme.Music_ABCTheme
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.io.OutputStreamWriter
+
+data class AbcTune(
+    val title: String,
+    val content: String,
+    val sourceUri: Uri,
+    val originalContent: String // Used to identify the tune in the file for replacement
+)
+
+private const val PREFS_NAME = "MusicAbcPrefs"
+private const val KEY_DIRECTORY_URI = "directoryUri"
+private const val KEY_SELECTED_FILES = "selectedFiles"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,34 +83,157 @@ class MainActivity : ComponentActivity() {
 @PreviewScreenSizes
 @Composable
 fun Music_ABCApp() {
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
-    var abcContent by rememberSaveable { mutableStateOf("X:1\nT:Sample Tune\nM:4/4\nL:1/4\nK:C\nC D E F | G A B c |") }
-    var currentUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var showPreview by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE) }
+    
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
+    
+    // Persist selected tune and content
+    var selectedTuneTitle by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedTuneUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedTune by remember { mutableStateOf<AbcTune?>(null) }
+    var abcContent by rememberSaveable { mutableStateOf("") }
+    
+    var directoryUri by rememberSaveable { 
+        mutableStateOf(prefs.getString(KEY_DIRECTORY_URI, null)) 
+    }
+    var showPreview by rememberSaveable { mutableStateOf(true) }
+    var isLoadingFiles by remember { mutableStateOf(false) }
+    
+    val parsedTunes = remember { mutableStateListOf<AbcTune>() }
+    
+    val selectedFilesUris = rememberSaveable(saver = listSaver(
+        save = { it.toList() },
+        restore = { it.toMutableStateList() }
+    )) { 
+        val savedFiles = prefs.getStringSet(KEY_SELECTED_FILES, emptySet()) ?: emptySet()
+        savedFiles.toMutableStateList()
+    }
 
-    val openDocumentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
+    // Effect to persist selected files when they change
+    LaunchedEffect(selectedFilesUris.toList()) {
+        prefs.edit().putStringSet(KEY_SELECTED_FILES, selectedFilesUris.toSet()).apply()
+    }
+
+    fun parseAbcContent(content: String, sourceUri: Uri): List<AbcTune> {
+        val tunes = mutableListOf<AbcTune>()
+        val parts = content.split(Regex("(?m)^X:"))
+        parts.forEach { part ->
+            if (part.trim().isNotEmpty()) {
+                val fullTuneContent = "X:$part"
+                val titleMatch = Regex("(?m)^T:(.*)").find(fullTuneContent)
+                val title = titleMatch?.groupValues?.get(1)?.trim() ?: "Untitled"
+                tunes.add(AbcTune(title, fullTuneContent, sourceUri, fullTuneContent))
+            }
+        }
+        return tunes
+    }
+
+    var refreshCount by rememberSaveable { mutableStateOf(0) }
+
+    // Main loading effect - triggered by changes to directory, selected files, or manual refresh
+    LaunchedEffect(directoryUri, selectedFilesUris.size, context, refreshCount) {
+        isLoadingFiles = true
+        try {
+            val allParsedTunes = mutableListOf<AbcTune>()
+            val filesToProcess = mutableListOf<DocumentFile>()
+            
+            if (directoryUri != null) {
+                val root = DocumentFile.fromTreeUri(context, Uri.parse(directoryUri!!))
+                root?.listFiles()?.filter { it.name?.endsWith(".abc") == true }?.let {
+                    filesToProcess.addAll(it)
+                }
+            }
+            
+            selectedFilesUris.forEach { uriString ->
+                DocumentFile.fromSingleUri(context, Uri.parse(uriString))?.let {
+                    filesToProcess.add(it)
+                }
+            }
+            
+            filesToProcess.forEach { file ->
+                try {
+                    context.contentResolver.openInputStream(file.uri)?.use { inputStream ->
+                        val content = BufferedReader(InputStreamReader(inputStream)).readText()
+                        allParsedTunes.addAll(parseAbcContent(content, file.uri))
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            
+            parsedTunes.clear()
+            parsedTunes.addAll(allParsedTunes)
+            
+            // Restore selection after reload
+            if (selectedTuneTitle != null && selectedTuneUri != null) {
+                selectedTune = allParsedTunes.find { 
+                    it.title == selectedTuneTitle && it.sourceUri.toString() == selectedTuneUri 
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isLoadingFiles = false
+        }
+    }
+
+    fun saveTune(tune: AbcTune, newContent: String) {
+        try {
+            val sourceUri = tune.sourceUri
+            val currentFileContent = context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).readText()
+            } ?: return
+
+            val updatedFileContent = currentFileContent.replace(tune.originalContent, newContent)
+
+            context.contentResolver.openOutputStream(sourceUri, "wt")?.use { outputStream ->
+                outputStream.write(updatedFileContent.toByteArray())
+            }
+
+            val index = parsedTunes.indexOf(tune)
+            if (index != -1) {
+                val updatedTune = tune.copy(content = newContent, originalContent = newContent)
+                parsedTunes[index] = updatedTune
+                selectedTune = updatedTune
+                abcContent = newContent
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    val openDirectoryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         uri?.let {
-            currentUri = it.toString()
-            context.contentResolver.openInputStream(it)?.use { inputStream ->
-                BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                    abcContent = reader.readText()
-                }
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                prefs.edit().putString(KEY_DIRECTORY_URI, it.toString()).apply()
+                directoryUri = it.toString()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
 
-    val createDocumentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/plain")
-    ) { uri ->
-        uri?.let {
-            currentUri = it.toString()
-            context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                OutputStreamWriter(outputStream).use { writer ->
-                    writer.write(abcContent)
+    val openFilesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        uris.forEach { uri ->
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+                if (!selectedFilesUris.contains(uri.toString())) {
+                    selectedFilesUris.add(uri.toString())
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -103,48 +256,119 @@ fun Music_ABCApp() {
         }
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Column(modifier = Modifier.padding(innerPadding).padding(16.dp)) {
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                    Button(onClick = {
-                        abcContent = "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
-                        currentUri = null
-                    }) {
-                        Text("New")
-                    }
-                    Button(onClick = { openDocumentLauncher.launch(arrayOf("*/*")) }, modifier = Modifier.padding(start = 8.dp)) {
-                        Text("Open")
-                    }
-                    if (currentUri != null) {
-                        Button(onClick = {
-                            try {
-                                val uri = Uri.parse(currentUri)
-                                context.contentResolver.openOutputStream(uri)?.use { os ->
-                                    os.write(abcContent.toByteArray())
+            Row(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                // Left Pane: Tune List
+                Surface(
+                    modifier = Modifier
+                        .width(250.dp)
+                        .fillMaxHeight(),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Button(
+                            onClick = { openDirectoryLauncher.launch(null) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Add Folder", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Button(
+                            onClick = { openFilesLauncher.launch(arrayOf("*/*")) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Add Files (Google Drive)", style = MaterialTheme.typography.labelMedium)
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                "Tunes",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isLoadingFiles) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else if (directoryUri != null || selectedFilesUris.isNotEmpty()) {
+                                Button(
+                                    onClick = { refreshCount++ },
+                                    modifier = Modifier.height(24.dp).padding(0.dp),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)
+                                ) {
+                                    Text("Refresh", style = MaterialTheme.typography.labelSmall)
                                 }
-                            } catch (e: Exception) {
-                                e.printStackTrace()
                             }
-                        }, modifier = Modifier.padding(start = 8.dp)) {
-                            Text("Save")
+                        }
+                        
+                        HorizontalDivider()
+                        
+                        LazyColumn {
+                            items(parsedTunes) { tune ->
+                                val isSelected = selectedTune == tune
+                                Text(
+                                    text = tune.title,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { 
+                                            selectedTune = tune
+                                            abcContent = tune.content
+                                            selectedTuneTitle = tune.title
+                                            selectedTuneUri = tune.sourceUri.toString()
+                                        }
+                                        .padding(8.dp),
+                                    style = if (isSelected) {
+                                        MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
+                                    } else {
+                                        MaterialTheme.typography.bodyMedium
+                                    }
+                                )
+                            }
                         }
                     }
-                    Button(onClick = { createDocumentLauncher.launch("music.abc") }, modifier = Modifier.padding(start = 8.dp)) {
-                        Text("Save As")
-                    }
-                    Button(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
-                        Text(if (showPreview) "Edit" else "View")
-                    }
                 }
-                
-                if (showPreview) {
-                    AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
-                } else {
-                    TextField(
-                        value = abcContent,
-                        onValueChange = { abcContent = it },
-                        modifier = Modifier.fillMaxSize(),
-                        label = { Text("ABC Notation Editor") }
-                    )
+
+                // Main Content
+                Column(modifier = Modifier.weight(1f).padding(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        if (selectedTune != null) {
+                            Button(onClick = { saveTune(selectedTune!!, abcContent) }) {
+                                Text("Save")
+                            }
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
+                            Text(if (showPreview) "Edit" else "View")
+                        }
+                    }
+
+                    if (abcContent.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                if (directoryUri == null && selectedFilesUris.isEmpty()) {
+                                    Text("Start by adding tunes", style = MaterialTheme.typography.titleLarge)
+                                } else {
+                                    Text("Select a tune from the list", modifier = Modifier.padding(16.dp))
+                                }
+                            }
+                        }
+                    } else if (showPreview) {
+                        AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
+                    } else {
+                        TextField(
+                            value = abcContent,
+                            onValueChange = { abcContent = it },
+                            modifier = Modifier.fillMaxSize(),
+                            label = { Text("ABC Notation Editor") }
+                        )
+                    }
                 }
             }
         }

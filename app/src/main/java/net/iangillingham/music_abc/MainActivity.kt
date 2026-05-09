@@ -103,6 +103,7 @@ fun Music_ABCApp() {
     }
     var showPreview by rememberSaveable { mutableStateOf(true) }
     var isLoadingFiles by remember { mutableStateOf(false) }
+    var isCreatingNewTune by rememberSaveable { mutableStateOf(false) }
     
     var leftPaneWidth by rememberSaveable { mutableStateOf(250f) }
     val density = LocalDensity.current
@@ -245,6 +246,58 @@ fun Music_ABCApp() {
         }
     }
 
+    val createNewFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openOutputStream(it)?.use { os ->
+                    os.write(abcContent.toByteArray())
+                }
+                isCreatingNewTune = false
+                refreshCount++
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    val appendToFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            try {
+                val existingContent = context.contentResolver.openInputStream(it)?.use { inputStream ->
+                    BufferedReader(InputStreamReader(inputStream)).readText()
+                } ?: ""
+
+                val xValues = Regex("(?m)^X:\\s*(\\d+)").findAll(existingContent)
+                    .map { it.groupValues[1].toInt() }
+                    .toList()
+                val nextX = (xValues.maxOrNull() ?: 0) + 1
+
+                val updatedNewTune = abcContent.replaceFirst(Regex("(?m)^X:.*"), "X:$nextX")
+                
+                val finalContent = if (existingContent.isEmpty()) {
+                    updatedNewTune
+                } else if (existingContent.endsWith("\n")) {
+                    existingContent + "\n" + updatedNewTune
+                } else {
+                    existingContent + "\n\n" + updatedNewTune
+                }
+
+                context.contentResolver.openOutputStream(it, "wt")?.use { os ->
+                    os.write(finalContent.toByteArray())
+                }
+                
+                isCreatingNewTune = false
+                refreshCount++
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
     NavigationSuiteScaffold(
         navigationSuiteItems = {
             AppDestinations.entries.forEach {
@@ -288,6 +341,22 @@ fun Music_ABCApp() {
                             Text("Add Files (Google Drive)", style = MaterialTheme.typography.labelMedium)
                         }
                         
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Button(
+                            onClick = { 
+                                isCreatingNewTune = true
+                                selectedTune = null
+                                selectedTuneTitle = null
+                                selectedTuneUri = null
+                                abcContent = "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
+                                showPreview = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("New Tune", style = MaterialTheme.typography.labelMedium)
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         Row(
@@ -363,7 +432,22 @@ fun Music_ABCApp() {
                 // Main Content
                 Column(modifier = Modifier.weight(1f).padding(16.dp)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        if (selectedTune != null) {
+                        if (isCreatingNewTune) {
+                            Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
+                                Text("Save to New File")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
+                                Text("Add to Existing File")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(onClick = { 
+                                isCreatingNewTune = false
+                                abcContent = ""
+                            }) {
+                                Text("Cancel")
+                            }
+                        } else if (selectedTune != null) {
                             Button(onClick = { saveTune(selectedTune!!, abcContent) }) {
                                 Text("Save")
                             }
@@ -374,7 +458,7 @@ fun Music_ABCApp() {
                         }
                     }
 
-                    if (abcContent.isEmpty()) {
+                    if (abcContent.isEmpty() && !isCreatingNewTune) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                             Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
                                 if (directoryUri == null && selectedFilesUris.isEmpty()) {

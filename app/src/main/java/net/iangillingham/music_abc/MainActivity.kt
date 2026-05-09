@@ -3,14 +3,16 @@ package net.iangillingham.music_abc
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -45,7 +47,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
@@ -99,6 +103,9 @@ fun Music_ABCApp() {
     }
     var showPreview by rememberSaveable { mutableStateOf(true) }
     var isLoadingFiles by remember { mutableStateOf(false) }
+    
+    var leftPaneWidth by rememberSaveable { mutableStateOf(250f) }
+    val density = LocalDensity.current
     
     val parsedTunes = remember { mutableStateListOf<AbcTune>() }
     
@@ -260,7 +267,7 @@ fun Music_ABCApp() {
                 // Left Pane: Tune List
                 Surface(
                     modifier = Modifier
-                        .width(250.dp)
+                        .width(leftPaneWidth.dp)
                         .fillMaxHeight(),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
@@ -334,6 +341,24 @@ fun Music_ABCApp() {
                         }
                     }
                 }
+
+                // Splitter handle
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(10.dp) // Increased hit area for easier touch
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures { change, dragAmount ->
+                                change.consume()
+                                with(density) {
+                                    val newWidth = leftPaneWidth + dragAmount.toDp().value
+                                    leftPaneWidth = newWidth.coerceIn(150f, 600f)
+                                }
+                            }
+                        }
+                        .padding(horizontal = 4.dp) // Makes the visual line thinner than the hit area
+                        .background(MaterialTheme.colorScheme.outline) // Higher contrast color
+                )
 
                 // Main Content
                 Column(modifier = Modifier.weight(1f).padding(16.dp)) {

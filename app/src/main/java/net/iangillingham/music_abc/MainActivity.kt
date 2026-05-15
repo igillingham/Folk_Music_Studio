@@ -443,6 +443,8 @@ fun Music_ABCApp() {
                                             selectedTuneUri = tune.sourceUri.toString()
                                             isCreatingNewTune = false
                                             showPreview = true
+                                            isPlaying = false
+                                            isPaused = false
                                             scope.launch { drawerState.close() }
                                         }
                                     }
@@ -628,6 +630,8 @@ fun Music_ABCApp() {
                                     selectedTuneUri = tune.sourceUri.toString()
                                     isCreatingNewTune = false
                                     showPreview = true
+                                    isPlaying = false
+                                    isPaused = false
                                     scope.launch { drawerState.close() }
                                 }
                             }) {

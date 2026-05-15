@@ -3,6 +3,7 @@ package net.iangillingham.music_abc
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.WindowManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
@@ -26,14 +27,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
@@ -42,10 +51,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.toMutableStateList
+import androidx.compose.material3.rememberDrawerState
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -75,6 +87,7 @@ private const val KEY_SELECTED_FILES = "selectedFiles"
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
         setContent {
             Music_ABCTheme {
@@ -104,9 +117,11 @@ fun Music_ABCApp() {
     var showPreview by rememberSaveable { mutableStateOf(true) }
     var isLoadingFiles by remember { mutableStateOf(false) }
     var isCreatingNewTune by rememberSaveable { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
     
     var leftPaneWidth by rememberSaveable { mutableStateOf(250f) }
-    val density = LocalDensity.current
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
     
     val parsedTunes = remember { mutableStateListOf<AbcTune>() }
     
@@ -315,16 +330,13 @@ fun Music_ABCApp() {
             }
         }
     ) {
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Row(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                // Left Pane: Tune List
-                Surface(
-                    modifier = Modifier
-                        .width(leftPaneWidth.dp)
-                        .fillMaxHeight(),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    modifier = Modifier.width(leftPaneWidth.dp)
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
+                    Column(modifier = Modifier.padding(16.dp).fillMaxHeight()) {
                         Button(
                             onClick = { openDirectoryLauncher.launch(null) },
                             modifier = Modifier.fillMaxWidth()
@@ -351,6 +363,7 @@ fun Music_ABCApp() {
                                 selectedTuneUri = null
                                 abcContent = "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
                                 showPreview = false
+                                scope.launch { drawerState.close() }
                             },
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -398,6 +411,7 @@ fun Music_ABCApp() {
                                             abcContent = tune.content
                                             selectedTuneTitle = tune.title
                                             selectedTuneUri = tune.sourceUri.toString()
+                                            scope.launch { drawerState.close() }
                                         }
                                         .padding(8.dp),
                                     style = if (isSelected) {
@@ -410,40 +424,29 @@ fun Music_ABCApp() {
                         }
                     }
                 }
-
-                // Splitter handle
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(10.dp) // Increased hit area for easier touch
-                        .pointerInput(Unit) {
-                            detectHorizontalDragGestures { change, dragAmount ->
-                                change.consume()
-                                with(density) {
-                                    val newWidth = leftPaneWidth + dragAmount.toDp().value
-                                    leftPaneWidth = newWidth.coerceIn(150f, 600f)
-                                }
-                            }
-                        }
-                        .padding(horizontal = 4.dp) // Makes the visual line thinner than the hit area
-                        .background(MaterialTheme.colorScheme.outline) // Higher contrast color
-                )
-
+            }
+        ) {
+            Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                 // Main Content
-                Column(modifier = Modifier.weight(1f).padding(16.dp)) {
+                Column(modifier = Modifier.padding(innerPadding).fillMaxSize().padding(16.dp)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
+                        }
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+
                         if (isCreatingNewTune) {
                             Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
-                                Text("Save to New File")
+                                Text("Save New")
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
-                                Text("Add to Existing File")
+                                Text("Append")
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Button(onClick = { 
-                                isCreatingNewTune = false
-                                abcContent = ""
+                                showDiscardDialog = true
                             }) {
                                 Text("Cancel")
                             }
@@ -464,7 +467,7 @@ fun Music_ABCApp() {
                                 if (directoryUri == null && selectedFilesUris.isEmpty()) {
                                     Text("Start by adding tunes", style = MaterialTheme.typography.titleLarge)
                                 } else {
-                                    Text("Select a tune from the list", modifier = Modifier.padding(16.dp))
+                                    Text("Open the menu and select a tune", modifier = Modifier.padding(16.dp))
                                 }
                             }
                         }
@@ -476,6 +479,28 @@ fun Music_ABCApp() {
                             onValueChange = { abcContent = it },
                             modifier = Modifier.fillMaxSize(),
                             label = { Text("ABC Notation Editor") }
+                        )
+                    }
+
+                    if (showDiscardDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDiscardDialog = false },
+                            title = { Text("Discard Edits?") },
+                            text = { Text("Are you sure you want to discard your changes to this new tune?") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showDiscardDialog = false
+                                    isCreatingNewTune = false
+                                    abcContent = ""
+                                }) {
+                                    Text("Discard")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDiscardDialog = false }) {
+                                    Text("Continue Editing")
+                                }
+                            }
                         )
                     }
                 }

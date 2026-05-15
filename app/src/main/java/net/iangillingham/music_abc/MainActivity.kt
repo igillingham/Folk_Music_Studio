@@ -551,7 +551,11 @@ fun Music_ABCApp() {
                             }
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                        IconButton(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
+                        IconButton(onClick = { 
+                            isPlaying = false
+                            isPaused = false
+                            showPreview = !showPreview 
+                        }, modifier = Modifier.padding(start = 8.dp)) {
                             Icon(
                                 if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
                                 contentDescription = if (showPreview) "Edit" else "View"
@@ -570,12 +574,27 @@ fun Music_ABCApp() {
                             }
                         }
                     } else if (showPreview) {
-                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), modifier = Modifier.fillMaxSize())
+                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
+                            onTempoDetected = { detectedBpm ->
+                                // Use detected BPM if Q: field exists, otherwise default to 120
+                                val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
+                                val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
+                                tempo = finalBpm.toFloat()
+                                activeTempo = finalBpm.toFloat()
+                            },
+                            modifier = Modifier.fillMaxSize())
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
                             // Top half: Rendered notation
                             Box(modifier = Modifier.weight(1f)) {
-                                AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), modifier = Modifier.fillMaxSize())
+                                AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
+                                    onTempoDetected = { detectedBpm ->
+                                        val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
+                                        val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
+                                        tempo = finalBpm.toFloat()
+                                        activeTempo = finalBpm.toFloat()
+                                    },
+                                    modifier = Modifier.fillMaxSize())
                             }
                         
                         // Visible horizontal line
@@ -674,7 +693,7 @@ fun Music_ABCApp() {
 }
 
 @Composable
-fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boolean = false, isPaused: Boolean = false, tempo: Int = 120) {
+fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boolean = false, isPaused: Boolean = false, tempo: Int = 120, onTempoDetected: (Int) -> Unit = {}) {
     val escapedAbc = abcCode.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
     
     val html = remember {
@@ -703,6 +722,8 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                 let currentBpm = 120;
                 let currentAbc = "";
                 let isInitializing = false;
+                let currentBeat = 0;
+                let timingCallbacks;
 
                 window.onload = function() {
                     document.getElementById("loading").innerHTML = "Waiting for ABCJS...";
@@ -732,6 +753,11 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                     }
                     if (abc === currentAbc) return; // Don't re-render if content is identical
                     currentAbc = abc;
+                    currentBeat = 0;
+                    if (timingCallbacks) {
+                        timingCallbacks.stop();
+                        timingCallbacks = null;
+                    }
                     
                     console.log("Rendering ABC content");
                     document.getElementById("errors").innerHTML = "";
@@ -744,6 +770,18 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                             synthControl.stop();
                             synthControl = null;
                         }
+
+                        // Notify Android about detected tempo
+                        if (visualObj && visualObj[0]) {
+                            const beatsPerMeasure = visualObj[0].getBeatsPerMeasure();
+                            const msPerMeasure = visualObj[0].millisecondsPerMeasure();
+                            if (msPerMeasure > 0) {
+                                const detectedBpm = Math.round((beatsPerMeasure / msPerMeasure) * 60000);
+                                if (window.AndroidInterface) {
+                                    window.AndroidInterface.onTempoDetected(detectedBpm);
+                                }
+                            }
+                        }
                     } catch (e) {
                         document.getElementById("errors").innerHTML = "Render error: " + e.message;
                     }
@@ -752,11 +790,17 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                 async function play(bpm) {
                     if (!visualObj || !visualObj[0] || isInitializing) return;
                     
+                    const seekToBeat = currentBeat;
+
                     // If tempo changed while playing, we need to restart the synth
                     // but we'll use a small threshold to avoid jitter
                     if (synthControl && Math.abs(bpm - currentBpm) > 1) {
                         synthControl.stop();
                         synthControl = null;
+                        if (timingCallbacks) {
+                            timingCallbacks.stop();
+                            timingCallbacks = null;
+                        }
                     }
 
                     if (isPlaying(synthControl) && bpm === currentBpm) return;
@@ -783,9 +827,30 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                                 millisecondsPerMeasure: msPerMeasure
                             });
                             await synthControl.prime();
+                            
+                            if (seekToBeat > 0) {
+                                await synthControl.seek(seekToBeat, "beats");
+                            }
+                            
                             isInitializing = false;
                         }
+
+                        if (!timingCallbacks) {
+                            timingCallbacks = new ABCJS.TimingCallbacks(visualObj[0], {
+                                beatCallback: function(beat) {
+                                    currentBeat = beat;
+                                },
+                                eventCallback: function(event) {
+                                    if (!event) {
+                                        // End of tune
+                                        stop();
+                                    }
+                                }
+                            });
+                        }
+
                         synthControl.start();
+                        timingCallbacks.start();
                     } catch (e) {
                         isInitializing = false;
                         document.getElementById("errors").innerHTML = "Audio error: " + e.message;
@@ -798,6 +863,7 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
 
                 function pause() {
                     if (synthControl) synthControl.pause();
+                    if (timingCallbacks) timingCallbacks.pause();
                 }
 
                 function stop() {
@@ -805,6 +871,11 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                         synthControl.stop();
                         synthControl = null; // Ensure fresh start next time
                     }
+                    if (timingCallbacks) {
+                        timingCallbacks.stop();
+                        timingCallbacks = null;
+                    }
+                    currentBeat = 0;
                 }
             </script>
         </body>
@@ -818,6 +889,12 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = true
+                addJavascriptInterface(object {
+                    @android.webkit.JavascriptInterface
+                    fun onTempoDetected(bpm: Int) {
+                        post { onTempoDetected(bpm) }
+                    }
+                }, "AndroidInterface")
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         // Initial render after page load

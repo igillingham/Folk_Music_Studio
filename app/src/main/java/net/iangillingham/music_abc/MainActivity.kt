@@ -52,6 +52,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -131,6 +132,8 @@ fun Music_ABCApp() {
     
     var isPlaying by remember { mutableStateOf(false) }
     var isPaused by remember { mutableStateOf(false) }
+    var tempo by rememberSaveable { mutableStateOf(120f) }
+    var activeTempo by rememberSaveable { mutableStateOf(120f) }
     
     var leftPaneWidth by rememberSaveable { mutableStateOf(250f) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -526,6 +529,26 @@ fun Music_ABCApp() {
                             }, enabled = isPlaying) {
                                 Icon(Icons.Default.Stop, contentDescription = "Stop")
                             }
+
+                            // Tempo Slider
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                Text(
+                                    text = tempo.toInt().toString(),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                Slider(
+                                    value = tempo,
+                                    onValueChange = { 
+                                        tempo = it
+                                    },
+                                    onValueChangeFinished = {
+                                        activeTempo = tempo
+                                    },
+                                    valueRange = 40f..200f,
+                                    modifier = Modifier.width(150.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.weight(1f))
                         IconButton(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
@@ -547,12 +570,12 @@ fun Music_ABCApp() {
                             }
                         }
                     } else if (showPreview) {
-                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, modifier = Modifier.fillMaxSize())
+                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), modifier = Modifier.fillMaxSize())
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
                             // Top half: Rendered notation
                             Box(modifier = Modifier.weight(1f)) {
-                                AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, modifier = Modifier.fillMaxSize())
+                                AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), modifier = Modifier.fillMaxSize())
                             }
                         
                         // Visible horizontal line
@@ -651,7 +674,7 @@ fun Music_ABCApp() {
 }
 
 @Composable
-fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boolean = false, isPaused: Boolean = false) {
+fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boolean = false, isPaused: Boolean = false, tempo: Int = 120) {
     val escapedAbc = abcCode.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
     
     val html = remember {
@@ -677,6 +700,9 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                 let synthControl;
                 let audioContext;
                 let isReady = false;
+                let currentBpm = 120;
+                let currentAbc = "";
+                let isInitializing = false;
 
                 window.onload = function() {
                     document.getElementById("loading").innerHTML = "Waiting for ABCJS...";
@@ -704,6 +730,9 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                         window.pendingAbc = abc;
                         return;
                     }
+                    if (abc === currentAbc) return; // Don't re-render if content is identical
+                    currentAbc = abc;
+                    
                     console.log("Rendering ABC content");
                     document.getElementById("errors").innerHTML = "";
                     try {
@@ -720,8 +749,20 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                     }
                 }
 
-                async function play() {
-                    if (!visualObj || !visualObj[0]) return;
+                async function play(bpm) {
+                    if (!visualObj || !visualObj[0] || isInitializing) return;
+                    
+                    // If tempo changed while playing, we need to restart the synth
+                    // but we'll use a small threshold to avoid jitter
+                    if (synthControl && Math.abs(bpm - currentBpm) > 1) {
+                        synthControl.stop();
+                        synthControl = null;
+                    }
+
+                    if (isPlaying(synthControl) && bpm === currentBpm) return;
+
+                    currentBpm = bpm;
+
                     try {
                         if (!audioContext) {
                             audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -731,18 +772,28 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                         }
                         
                         if (!synthControl) {
+                            isInitializing = true;
                             synthControl = new ABCJS.synth.CreateSynth();
+                            const beatsPerMeasure = visualObj[0].getBeatsPerMeasure();
+                            const msPerMeasure = (beatsPerMeasure / bpm) * 60000;
+                            
                             await synthControl.init({
                                 audioContext: audioContext,
                                 visualObj: visualObj[0],
-                                millisecondsPerMeasure: visualObj[0].millisecondsPerMeasure()
+                                millisecondsPerMeasure: msPerMeasure
                             });
                             await synthControl.prime();
+                            isInitializing = false;
                         }
                         synthControl.start();
                     } catch (e) {
+                        isInitializing = false;
                         document.getElementById("errors").innerHTML = "Audio error: " + e.message;
                     }
+                }
+
+                function isPlaying(synth) {
+                    return synth && synth.isRunning;
                 }
 
                 function pause() {
@@ -750,7 +801,10 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
                 }
 
                 function stop() {
-                    if (synthControl) synthControl.stop();
+                    if (synthControl) {
+                        synthControl.stop();
+                        synthControl = null; // Ensure fresh start next time
+                    }
                 }
             </script>
         </body>
@@ -781,14 +835,14 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boo
         },
         update = { webView ->
             // Update the notation content via JS
-            webView.evaluateJavascript("if (typeof render === 'function') { render(`${escapedAbc}`); } else { window.pendingAbc = `${escapedAbc}`; }", null)
+            webView.evaluateJavascript("if (typeof render === 'function') { render(`${escapedAbc}`); }", null)
             
             // Handle playback state
             if (isPlaying) {
                 if (isPaused) {
                     webView.evaluateJavascript("if (typeof pause === 'function') pause();", null)
                 } else {
-                    webView.evaluateJavascript("if (typeof play === 'function') play();", null)
+                    webView.evaluateJavascript("if (typeof play === 'function') play(${tempo.toInt()});", null)
                 }
             } else {
                 webView.evaluateJavascript("if (typeof stop === 'function') stop();", null)

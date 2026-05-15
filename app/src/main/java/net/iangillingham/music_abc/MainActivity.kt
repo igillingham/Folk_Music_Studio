@@ -51,7 +51,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,8 +68,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
@@ -109,8 +106,6 @@ class MainActivity : ComponentActivity() {
 fun Music_ABCApp() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE) }
-    
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
     
     // Persist selected tune and content
     var selectedTuneTitle by rememberSaveable { mutableStateOf<String?>(null) }
@@ -347,292 +342,274 @@ fun Music_ABCApp() {
         }
     }
 
-    NavigationSuiteScaffold(
-        navigationSuiteItems = {
-            AppDestinations.entries.forEach {
-                item(
-                    icon = {
-                        Icon(
-                            painterResource(it.icon),
-                            contentDescription = it.label
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                modifier = Modifier.width(leftPaneWidth.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxHeight()) {
+                    Button(
+                        onClick = { openDirectoryLauncher.launch(null) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Add Folder", style = MaterialTheme.typography.labelMedium)
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Button(
+                        onClick = { openFilesLauncher.launch(arrayOf("*/*")) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Add Files (Google Drive)", style = MaterialTheme.typography.labelMedium)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Button(
+                        onClick = { 
+                            isCreatingNewTune = true
+                            selectedTune = null
+                            selectedTuneTitle = null
+                            selectedTuneUri = null
+                            abcContent = "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
+                            showPreview = false
+                            scope.launch { drawerState.close() }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("New Tune", style = MaterialTheme.typography.labelMedium)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            "Tunes",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f)
                         )
-                    },
-                    label = { Text(it.label) },
-                    selected = it == currentDestination,
-                    onClick = { currentDestination = it }
-                )
-            }
-        }
-    ) {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet(
-                    modifier = Modifier.width(leftPaneWidth.dp)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp).fillMaxHeight()) {
-                        Button(
-                            onClick = { openDirectoryLauncher.launch(null) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Add Folder", style = MaterialTheme.typography.labelMedium)
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Button(
-                            onClick = { openFilesLauncher.launch(arrayOf("*/*")) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Add Files (Google Drive)", style = MaterialTheme.typography.labelMedium)
-                        }
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Button(
-                            onClick = { 
-                                isCreatingNewTune = true
-                                selectedTune = null
-                                selectedTuneTitle = null
-                                selectedTuneUri = null
-                                abcContent = "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
-                                showPreview = false
-                                scope.launch { drawerState.close() }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("New Tune", style = MaterialTheme.typography.labelMedium)
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Row(
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        ) {
-                            Text(
-                                "Tunes",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f)
+                        if (isLoadingFiles) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
                             )
-                            if (isLoadingFiles) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp
-                                )
-                            } else if (directoryUri != null || selectedFilesUris.isNotEmpty()) {
-                                Button(
-                                    onClick = { refreshCount++ },
-                                    modifier = Modifier.height(24.dp).padding(0.dp),
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)
-                                ) {
-                                    Text("Refresh", style = MaterialTheme.typography.labelSmall)
-                                }
+                        } else if (directoryUri != null || selectedFilesUris.isNotEmpty()) {
+                            Button(
+                                onClick = { refreshCount++ },
+                                modifier = Modifier.height(24.dp).padding(0.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp)
+                            ) {
+                                Text("Refresh", style = MaterialTheme.typography.labelSmall)
                             }
                         }
-                        
-                        HorizontalDivider()
-                        
-                        LazyColumn {
-                            items(parsedTunes) { tune ->
-                                val isSelected = selectedTune == tune
-                                Text(
-                                    text = tune.title,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { 
-                                            val hasChanges = if (isCreatingNewTune) {
-                                                abcContent != "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
-                                            } else {
-                                                selectedTune != null && abcContent != selectedTune?.content
-                                            }
-
-                                            if (hasChanges) {
-                                                pendingTuneSelection = tune
-                                                showUnsavedChangesDialog = true
-                                            } else {
-                                                selectedTune = tune
-                                                abcContent = tune.content
-                                                selectedTuneTitle = tune.title
-                                                selectedTuneUri = tune.sourceUri.toString()
-                                                isCreatingNewTune = false
-                                                scope.launch { drawerState.close() }
-                                            }
+                    }
+                    
+                    HorizontalDivider()
+                    
+                    LazyColumn {
+                        items(parsedTunes) { tune ->
+                            val isSelected = selectedTune == tune
+                            Text(
+                                text = tune.title,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { 
+                                        val hasChanges = if (isCreatingNewTune) {
+                                            abcContent != "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
+                                        } else {
+                                            selectedTune != null && abcContent != selectedTune?.content
                                         }
-                                        .padding(8.dp),
-                                    style = if (isSelected) {
-                                        MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
-                                    } else {
-                                        MaterialTheme.typography.bodyMedium
+
+                                        if (hasChanges) {
+                                            pendingTuneSelection = tune
+                                            showUnsavedChangesDialog = true
+                                        } else {
+                                            selectedTune = tune
+                                            abcContent = tune.content
+                                            selectedTuneTitle = tune.title
+                                            selectedTuneUri = tune.sourceUri.toString()
+                                            isCreatingNewTune = false
+                                            scope.launch { drawerState.close() }
+                                        }
                                     }
-                                )
-                            }
+                                    .padding(8.dp),
+                                style = if (isSelected) {
+                                    MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
+                                } else {
+                                    MaterialTheme.typography.bodyMedium
+                                }
+                            )
                         }
                     }
                 }
             }
-        ) {
-            Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                // Main Content
-                Column(modifier = Modifier
-                    .padding(innerPadding)
-                    .imePadding() // Resizes layout to keep content above keyboard
-                    .fillMaxSize()
-                    .padding(16.dp)
-                ) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
+        }
+    ) {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            // Main Content
+            Column(modifier = Modifier
+                .padding(innerPadding)
+                .imePadding() // Resizes layout to keep content above keyboard
+                .fillMaxSize()
+                .padding(16.dp)
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
+                    }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    if (isCreatingNewTune) {
+                        Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
+                            Text("Save New")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
+                            Text("Append")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(onClick = { 
+                            showDiscardDialog = true
+                        }) {
+                            Text("Cancel")
+                        }
+                    } else if (selectedTune != null) {
+                        val hasChanges = abcContent != selectedTune?.content
+                        IconButton(
+                            onClick = { saveTune(selectedTune!!, abcContent) },
+                            enabled = hasChanges
+                        ) {
+                            Icon(
+                                Icons.Default.Save, 
+                                contentDescription = "Save",
+                                tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                        }
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
+                        Icon(
+                            if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
+                            contentDescription = if (showPreview) "Edit" else "View"
+                        )
+                    }
+                }
+
+                if (abcContent.isEmpty() && !isCreatingNewTune) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                            if (directoryUri == null && selectedFilesUris.isEmpty()) {
+                                Text("Start by adding tunes", style = MaterialTheme.typography.titleLarge)
+                            } else {
+                                Text("Open the menu and select a tune", modifier = Modifier.padding(16.dp))
+                            }
+                        }
+                    }
+                } else if (showPreview) {
+                    AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Top half: Rendered notation
+                        Box(modifier = Modifier.weight(1f)) {
+                            AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
                         }
                         
-                        Spacer(modifier = Modifier.width(8.dp))
+                        // Visible horizontal line
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            thickness = 2.dp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        
+                        // Bottom half: ABC Notation Editor
+                        TextField(
+                            value = abcContent,
+                            onValueChange = { abcContent = it },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            label = { Text("ABC Notation Editor") }
+                        )
+                    }
+                }
 
-                        if (isCreatingNewTune) {
-                            Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
-                                Text("Save New")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
-                                Text("Append")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(onClick = { 
-                                showDiscardDialog = true
+                if (showDiscardDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDiscardDialog = false },
+                        title = { Text("Discard Edits?") },
+                        text = { Text("Are you sure you want to discard your changes to this new tune?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showDiscardDialog = false
+                                isCreatingNewTune = false
+                                abcContent = ""
                             }) {
+                                Text("Discard")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDiscardDialog = false }) {
+                                Text("Continue Editing")
+                            }
+                        }
+                    )
+                }
+
+                if (showDeleteDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = { Text("Delete Tune?") },
+                        text = { Text("Are you sure you want to permanently delete '${selectedTune?.title}' from the file?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                selectedTune?.let { deleteTune(it) }
+                                showDeleteDialog = false
+                            }) {
+                                Text("Delete")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteDialog = false }) {
                                 Text("Cancel")
                             }
-                        } else if (selectedTune != null) {
-                            val hasChanges = abcContent != selectedTune?.content
-                            IconButton(
-                                onClick = { saveTune(selectedTune!!, abcContent) },
-                                enabled = hasChanges
-                            ) {
-                                Icon(
-                                    Icons.Default.Save, 
-                                    contentDescription = "Save",
-                                    tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(onClick = { showDeleteDialog = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete")
-                            }
                         }
-                        Spacer(modifier = Modifier.weight(1f))
-                        IconButton(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
-                            Icon(
-                                if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
-                                contentDescription = if (showPreview) "Edit" else "View"
-                            )
-                        }
-                    }
+                    )
+                }
 
-                    if (abcContent.isEmpty() && !isCreatingNewTune) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                                if (directoryUri == null && selectedFilesUris.isEmpty()) {
-                                    Text("Start by adding tunes", style = MaterialTheme.typography.titleLarge)
-                                } else {
-                                    Text("Open the menu and select a tune", modifier = Modifier.padding(16.dp))
-                                }
-                            }
-                        }
-                    } else if (showPreview) {
-                        AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
-                    } else {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            // Top half: Rendered notation
-                            Box(modifier = Modifier.weight(1f)) {
-                                AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
-                            }
-                            
-                            // Visible horizontal line
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                thickness = 2.dp,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                            
-                            // Bottom half: ABC Notation Editor
-                            TextField(
-                                value = abcContent,
-                                onValueChange = { abcContent = it },
-                                modifier = Modifier.weight(1f).fillMaxWidth(),
-                                label = { Text("ABC Notation Editor") }
-                            )
-                        }
-                    }
-
-                    if (showDiscardDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showDiscardDialog = false },
-                            title = { Text("Discard Edits?") },
-                            text = { Text("Are you sure you want to discard your changes to this new tune?") },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    showDiscardDialog = false
+                if (showUnsavedChangesDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showUnsavedChangesDialog = false },
+                        title = { Text("Unsaved Changes") },
+                        text = { Text("You have unsaved changes. Do you want to discard them and switch to another tune?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showUnsavedChangesDialog = false
+                                pendingTuneSelection?.let { tune ->
+                                    selectedTune = tune
+                                    abcContent = tune.content
+                                    selectedTuneTitle = tune.title
+                                    selectedTuneUri = tune.sourceUri.toString()
                                     isCreatingNewTune = false
-                                    abcContent = ""
-                                }) {
-                                    Text("Discard")
+                                    scope.launch { drawerState.close() }
                                 }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showDiscardDialog = false }) {
-                                    Text("Continue Editing")
-                                }
+                            }) {
+                                Text("Discard Changes")
                             }
-                        )
-                    }
-
-                    if (showDeleteDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showDeleteDialog = false },
-                            title = { Text("Delete Tune?") },
-                            text = { Text("Are you sure you want to permanently delete '${selectedTune?.title}' from the file?") },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    selectedTune?.let { deleteTune(it) }
-                                    showDeleteDialog = false
-                                }) {
-                                    Text("Delete")
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showDeleteDialog = false }) {
-                                    Text("Cancel")
-                                }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showUnsavedChangesDialog = false }) {
+                                Text("Keep Editing")
                             }
-                        )
-                    }
-
-                    if (showUnsavedChangesDialog) {
-                        AlertDialog(
-                            onDismissRequest = { showUnsavedChangesDialog = false },
-                            title = { Text("Unsaved Changes") },
-                            text = { Text("You have unsaved changes. Do you want to discard them and switch to another tune?") },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    showUnsavedChangesDialog = false
-                                    pendingTuneSelection?.let { tune ->
-                                        selectedTune = tune
-                                        abcContent = tune.content
-                                        selectedTuneTitle = tune.title
-                                        selectedTuneUri = tune.sourceUri.toString()
-                                        isCreatingNewTune = false
-                                        scope.launch { drawerState.close() }
-                                    }
-                                }) {
-                                    Text("Discard Changes")
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showUnsavedChangesDialog = false }) {
-                                    Text("Keep Editing")
-                                }
-                            }
-                        )
-                    }
+                        }
+                    )
                 }
             }
         }
@@ -681,29 +658,4 @@ fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier) {
         },
         modifier = modifier
     )
-}
-
-enum class AppDestinations(
-    val label: String,
-    val icon: Int,
-) {
-    HOME("Home", R.drawable.ic_home),
-    FAVORITES("Favorites", R.drawable.ic_favorite),
-    PROFILE("Profile", R.drawable.ic_account_box),
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Music_ABCTheme {
-        Greeting("Android")
-    }
 }

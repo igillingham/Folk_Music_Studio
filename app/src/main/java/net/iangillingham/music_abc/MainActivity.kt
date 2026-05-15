@@ -22,13 +22,20 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -118,6 +125,9 @@ fun Music_ABCApp() {
     var isLoadingFiles by remember { mutableStateOf(false) }
     var isCreatingNewTune by rememberSaveable { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showUnsavedChangesDialog by remember { mutableStateOf(false) }
+    var pendingTuneSelection by remember { mutableStateOf<AbcTune?>(null) }
     
     var leftPaneWidth by rememberSaveable { mutableStateOf(250f) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -221,6 +231,30 @@ fun Music_ABCApp() {
                 selectedTune = updatedTune
                 abcContent = newContent
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun deleteTune(tune: AbcTune) {
+        try {
+            val sourceUri = tune.sourceUri
+            val currentFileContent = context.contentResolver.openInputStream(sourceUri)?.use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).readText()
+            } ?: return
+
+            // Attempt to remove the tune and leading/trailing whitespace to avoid leaving gaps
+            val updatedFileContent = currentFileContent.replace(tune.originalContent, "").trim()
+
+            context.contentResolver.openOutputStream(sourceUri, "wt")?.use { outputStream ->
+                outputStream.write(updatedFileContent.toByteArray())
+            }
+
+            parsedTunes.remove(tune)
+            selectedTune = null
+            abcContent = ""
+            selectedTuneTitle = null
+            selectedTuneUri = null
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -407,11 +441,23 @@ fun Music_ABCApp() {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable { 
-                                            selectedTune = tune
-                                            abcContent = tune.content
-                                            selectedTuneTitle = tune.title
-                                            selectedTuneUri = tune.sourceUri.toString()
-                                            scope.launch { drawerState.close() }
+                                            val hasChanges = if (isCreatingNewTune) {
+                                                abcContent != "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
+                                            } else {
+                                                selectedTune != null && abcContent != selectedTune?.content
+                                            }
+
+                                            if (hasChanges) {
+                                                pendingTuneSelection = tune
+                                                showUnsavedChangesDialog = true
+                                            } else {
+                                                selectedTune = tune
+                                                abcContent = tune.content
+                                                selectedTuneTitle = tune.title
+                                                selectedTuneUri = tune.sourceUri.toString()
+                                                isCreatingNewTune = false
+                                                scope.launch { drawerState.close() }
+                                            }
                                         }
                                         .padding(8.dp),
                                     style = if (isSelected) {
@@ -428,7 +474,12 @@ fun Music_ABCApp() {
         ) {
             Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                 // Main Content
-                Column(modifier = Modifier.padding(innerPadding).fillMaxSize().padding(16.dp)) {
+                Column(modifier = Modifier
+                    .padding(innerPadding)
+                    .imePadding() // Resizes layout to keep content above keyboard
+                    .fillMaxSize()
+                    .padding(16.dp)
+                ) {
                     Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         IconButton(onClick = { scope.launch { drawerState.open() } }) {
                             Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
@@ -451,13 +502,28 @@ fun Music_ABCApp() {
                                 Text("Cancel")
                             }
                         } else if (selectedTune != null) {
-                            Button(onClick = { saveTune(selectedTune!!, abcContent) }) {
-                                Text("Save")
+                            val hasChanges = abcContent != selectedTune?.content
+                            IconButton(
+                                onClick = { saveTune(selectedTune!!, abcContent) },
+                                enabled = hasChanges
+                            ) {
+                                Icon(
+                                    Icons.Default.Save, 
+                                    contentDescription = "Save",
+                                    tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(onClick = { showDeleteDialog = true }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete")
                             }
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                        Button(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
-                            Text(if (showPreview) "Edit" else "View")
+                        IconButton(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
+                            Icon(
+                                if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
+                                contentDescription = if (showPreview) "Edit" else "View"
+                            )
                         }
                     }
 
@@ -474,12 +540,27 @@ fun Music_ABCApp() {
                     } else if (showPreview) {
                         AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
                     } else {
-                        TextField(
-                            value = abcContent,
-                            onValueChange = { abcContent = it },
-                            modifier = Modifier.fillMaxSize(),
-                            label = { Text("ABC Notation Editor") }
-                        )
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // Top half: Rendered notation
+                            Box(modifier = Modifier.weight(1f)) {
+                                AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
+                            }
+                            
+                            // Visible horizontal line
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                thickness = 2.dp,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                            
+                            // Bottom half: ABC Notation Editor
+                            TextField(
+                                value = abcContent,
+                                onValueChange = { abcContent = it },
+                                modifier = Modifier.weight(1f).fillMaxWidth(),
+                                label = { Text("ABC Notation Editor") }
+                            )
+                        }
                     }
 
                     if (showDiscardDialog) {
@@ -499,6 +580,55 @@ fun Music_ABCApp() {
                             dismissButton = {
                                 TextButton(onClick = { showDiscardDialog = false }) {
                                     Text("Continue Editing")
+                                }
+                            }
+                        )
+                    }
+
+                    if (showDeleteDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDeleteDialog = false },
+                            title = { Text("Delete Tune?") },
+                            text = { Text("Are you sure you want to permanently delete '${selectedTune?.title}' from the file?") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    selectedTune?.let { deleteTune(it) }
+                                    showDeleteDialog = false
+                                }) {
+                                    Text("Delete")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDeleteDialog = false }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
+
+                    if (showUnsavedChangesDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showUnsavedChangesDialog = false },
+                            title = { Text("Unsaved Changes") },
+                            text = { Text("You have unsaved changes. Do you want to discard them and switch to another tune?") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showUnsavedChangesDialog = false
+                                    pendingTuneSelection?.let { tune ->
+                                        selectedTune = tune
+                                        abcContent = tune.content
+                                        selectedTuneTitle = tune.title
+                                        selectedTuneUri = tune.sourceUri.toString()
+                                        isCreatingNewTune = false
+                                        scope.launch { drawerState.close() }
+                                    }
+                                }) {
+                                    Text("Discard Changes")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showUnsavedChangesDialog = false }) {
+                                    Text("Keep Editing")
                                 }
                             }
                         )

@@ -434,6 +434,7 @@ fun Music_ABCApp() {
                                             selectedTuneTitle = tune.title
                                             selectedTuneUri = tune.sourceUri.toString()
                                             isCreatingNewTune = false
+                                            showPreview = true
                                             scope.launch { drawerState.close() }
                                         }
                                     }
@@ -598,6 +599,7 @@ fun Music_ABCApp() {
                                     selectedTuneTitle = tune.title
                                     selectedTuneUri = tune.sourceUri.toString()
                                     isCreatingNewTune = false
+                                    showPreview = true
                                     scope.launch { drawerState.close() }
                                 }
                             }) {

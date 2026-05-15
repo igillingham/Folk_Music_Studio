@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
+import android.webkit.ConsoleMessage
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
@@ -33,7 +35,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -123,6 +128,9 @@ fun Music_ABCApp() {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
     var pendingTuneSelection by remember { mutableStateOf<AbcTune?>(null) }
+    
+    var isPlaying by remember { mutableStateOf(false) }
+    var isPaused by remember { mutableStateOf(false) }
     
     var leftPaneWidth by rememberSaveable { mutableStateOf(250f) }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -459,71 +467,91 @@ fun Music_ABCApp() {
                 .fillMaxSize()
                 .padding(16.dp)
             ) {
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
-                    }
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
+                        }
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
 
-                    if (isCreatingNewTune) {
-                        Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
-                            Text("Save New")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
-                            Text("Append")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = { 
-                            showDiscardDialog = true
-                        }) {
-                            Text("Cancel")
-                        }
-                    } else if (selectedTune != null) {
-                        val hasChanges = abcContent != selectedTune?.content
-                        IconButton(
-                            onClick = { saveTune(selectedTune!!, abcContent) },
-                            enabled = hasChanges
-                        ) {
-                            Icon(
-                                Icons.Default.Save, 
-                                contentDescription = "Save",
-                                tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
-                        }
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
-                        Icon(
-                            if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
-                            contentDescription = if (showPreview) "Edit" else "View"
-                        )
-                    }
-                }
-
-                if (abcContent.isEmpty() && !isCreatingNewTune) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                            if (directoryUri == null && selectedFilesUris.isEmpty()) {
-                                Text("Start by adding tunes", style = MaterialTheme.typography.titleLarge)
-                            } else {
-                                Text("Open the menu and select a tune", modifier = Modifier.padding(16.dp))
+                        if (isCreatingNewTune) {
+                            Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
+                                Text("Save New")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
+                                Text("Append")
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(onClick = { 
+                                showDiscardDialog = true
+                            }) {
+                                Text("Cancel")
+                            }
+                        } else if (selectedTune != null) {
+                            val hasChanges = abcContent != selectedTune?.content
+                            IconButton(
+                                onClick = { saveTune(selectedTune!!, abcContent) },
+                                enabled = hasChanges
+                            ) {
+                                Icon(
+                                    Icons.Default.Save, 
+                                    contentDescription = "Save",
+                                    tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            IconButton(onClick = { showDeleteDialog = true }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete")
+                            }
+                            
+                            // Playback controls
+                            Spacer(modifier = Modifier.width(16.dp))
+                            IconButton(onClick = { 
+                                isPlaying = true
+                                isPaused = false
+                            }, enabled = !isPlaying || isPaused) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                            }
+                            IconButton(onClick = { 
+                                isPaused = true
+                            }, enabled = isPlaying && !isPaused) {
+                                Icon(Icons.Default.Pause, contentDescription = "Pause")
+                            }
+                            IconButton(onClick = { 
+                                isPlaying = false
+                                isPaused = false
+                            }, enabled = isPlaying) {
+                                Icon(Icons.Default.Stop, contentDescription = "Stop")
                             }
                         }
-                    }
-                } else if (showPreview) {
-                    AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
-                } else {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        // Top half: Rendered notation
-                        Box(modifier = Modifier.weight(1f)) {
-                            AbcVisualizer(abcContent, modifier = Modifier.fillMaxSize())
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = { showPreview = !showPreview }, modifier = Modifier.padding(start = 8.dp)) {
+                            Icon(
+                                if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
+                                contentDescription = if (showPreview) "Edit" else "View"
+                            )
                         }
+                    }
+
+                    if (abcContent.isEmpty() && !isCreatingNewTune) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                if (directoryUri == null && selectedFilesUris.isEmpty()) {
+                                    Text("Start by adding tunes", style = MaterialTheme.typography.titleLarge)
+                                } else {
+                                    Text("Open the menu and select a tune", modifier = Modifier.padding(16.dp))
+                                }
+                            }
+                        }
+                    } else if (showPreview) {
+                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, modifier = Modifier.fillMaxSize())
+                    } else {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            // Top half: Rendered notation
+                            Box(modifier = Modifier.weight(1f)) {
+                                AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, modifier = Modifier.fillMaxSize())
+                            }
                         
                         // Visible horizontal line
                         HorizontalDivider(
@@ -619,44 +647,148 @@ fun Music_ABCApp() {
 }
 
 @Composable
-fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier) {
+fun AbcVisualizer(abcCode: String, modifier: Modifier = Modifier, isPlaying: Boolean = false, isPaused: Boolean = false) {
     val escapedAbc = abcCode.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
-    val html = """
+    
+    val html = remember {
+        """
         <!DOCTYPE html>
         <html>
         <head>
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <script src="https://cdn.jsdelivr.net/npm/abcjs@latest/dist/abcjs-basic-min.js" type="text/javascript"></script>
+            <script src="file:///android_asset/abcjs-basic-min.js" type="text/javascript"></script>
             <style>
-                body { margin: 0; padding: 10px; }
-                #paper { width: 100%; }
+                body { margin: 0; padding: 10px; font-family: sans-serif; background-color: white; }
+                #paper { width: 100%; min-height: 100px; }
+                .error { color: red; font-size: 12px; }
+                #loading { color: #666; font-style: italic; }
             </style>
         </head>
         <body>
+            <div id="loading">Loading renderer...</div>
             <div id="paper"></div>
+            <div id="errors" class="error"></div>
             <script type="text/javascript">
-                function render() {
+                let visualObj;
+                let synthControl;
+                let audioContext;
+                let isReady = false;
+
+                window.onload = function() {
+                    document.getElementById("loading").innerHTML = "Waiting for ABCJS...";
+                    checkAbcjs();
+                };
+
+                function checkAbcjs() {
                     if (typeof ABCJS !== 'undefined') {
-                        ABCJS.renderAbc("paper", `$escapedAbc`, { responsive: "resize" });
+                        isReady = true;
+                        document.getElementById("loading").style.display = "none";
+                        console.log("ABCJS Ready");
+                        // Check if we have pending content to render
+                        const pendingAbc = window.pendingAbc;
+                        if (pendingAbc) {
+                            render(pendingAbc);
+                            delete window.pendingAbc;
+                        }
                     } else {
-                        setTimeout(render, 100);
+                        setTimeout(checkAbcjs, 100);
                     }
                 }
-                render();
+
+                function render(abc) {
+                    if (!isReady) {
+                        window.pendingAbc = abc;
+                        return;
+                    }
+                    console.log("Rendering ABC content");
+                    document.getElementById("errors").innerHTML = "";
+                    try {
+                        visualObj = ABCJS.renderAbc("paper", abc, { 
+                            responsive: "resize",
+                            paddingbottom: 30
+                        });
+                        if (synthControl) {
+                            synthControl.stop();
+                            synthControl = null;
+                        }
+                    } catch (e) {
+                        document.getElementById("errors").innerHTML = "Render error: " + e.message;
+                    }
+                }
+
+                async function play() {
+                    if (!visualObj || !visualObj[0]) return;
+                    try {
+                        if (!audioContext) {
+                            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        }
+                        if (audioContext.state === 'suspended') {
+                            await audioContext.resume();
+                        }
+                        
+                        if (!synthControl) {
+                            synthControl = new ABCJS.synth.CreateSynth();
+                            await synthControl.init({
+                                audioContext: audioContext,
+                                visualObj: visualObj[0],
+                                millisecondsPerMeasure: visualObj[0].millisecondsPerMeasure()
+                            });
+                            await synthControl.prime();
+                        }
+                        synthControl.start();
+                    } catch (e) {
+                        document.getElementById("errors").innerHTML = "Audio error: " + e.message;
+                    }
+                }
+
+                function pause() {
+                    if (synthControl) synthControl.pause();
+                }
+
+                function stop() {
+                    if (synthControl) synthControl.stop();
+                }
             </script>
         </body>
         </html>
     """.trimIndent()
+    }
 
     AndroidView(
         factory = { context ->
             WebView(context).apply {
                 settings.javaScriptEnabled = true
-                webViewClient = WebViewClient()
+                settings.domStorageEnabled = true
+                settings.allowFileAccess = true
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        // Initial render after page load
+                        view?.evaluateJavascript("render(`${escapedAbc}`);", null)
+                    }
+                }
+                webChromeClient = object : WebChromeClient() {
+                    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                        android.util.Log.d("AbcVisualizer", "${consoleMessage?.message()}")
+                        return true
+                    }
+                }
+                loadDataWithBaseURL("https://localhost", html, "text/html", "utf-8", null)
             }
         },
         update = { webView ->
-            webView.loadDataWithBaseURL("https://localhost", html, "text/html", "utf-8", null)
+            // Update the notation content via JS
+            webView.evaluateJavascript("if (typeof render === 'function') { render(`${escapedAbc}`); } else { window.pendingAbc = `${escapedAbc}`; }", null)
+            
+            // Handle playback state
+            if (isPlaying) {
+                if (isPaused) {
+                    webView.evaluateJavascript("if (typeof pause === 'function') pause();", null)
+                } else {
+                    webView.evaluateJavascript("if (typeof play === 'function') play();", null)
+                }
+            } else {
+                webView.evaluateJavascript("if (typeof stop === 'function') stop();", null)
+            }
         },
         modifier = modifier
     )

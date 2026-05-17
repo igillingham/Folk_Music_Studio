@@ -1,0 +1,117 @@
+package net.iangillingham.music_abc.ui.components
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import net.iangillingham.music_abc.model.AbcTune
+
+@Composable
+fun DiscardEditsDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Discard Edits?") },
+        text = { Text("Are you sure you want to discard your changes to this new tune?") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Discard")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Continue Editing")
+            }
+        }
+    )
+}
+
+@Composable
+fun DeleteTuneDialog(
+    tuneTitle: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Tune?") },
+        text = { Text("Are you sure you want to permanently delete '$tuneTitle' from the file?") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun UnsavedChangesDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Unsaved Changes") },
+        text = { Text("You have unsaved changes. Do you want to discard them and switch to another tune?") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Discard Changes")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Keep Editing")
+            }
+        }
+    )
+}
+
+@Composable
+fun SetupStorageDialog(
+    onAddFolder: () -> Unit,
+    onAddFiles: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Setup Storage") },
+        text = { 
+            Column {
+                Text("Add folders or specific files to your tune library.")
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onAddFolder,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Add Folder")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onAddFiles,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Add Files (Google Drive)")
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}

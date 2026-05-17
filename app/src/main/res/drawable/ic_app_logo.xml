@@ -1,0 +1,41 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Background Circle -->
+    <path
+        android:fillColor="#3F51B5"
+        android:pathData="M256,256m-240,0a240,240 0,1 1,480 0a240,240 0,1 1,-480 0" />
+
+    <!-- Staff Lines -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:pathData="M180,210 L420,210 M180,256 L420,256 M180,302 L420,302" />
+
+    <!-- Stylized 'a' (Clef-like) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="12"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M130,340 C100,340 80,310 80,280 C80,240 110,210 140,210 C160,210 175,230 175,260 L175,340 M175,280 C150,280 130,300 130,320" />
+
+    <!-- Stylized 'b' (Half Note) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="8"
+        android:strokeLineCap="round"
+        android:pathData="M260,180 L260,302" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="6"
+        android:pathData="M260,302 C285,302 300,282 300,265 C300,248 285,228 260,228" />
+
+    <!-- Stylized 'c' (Quarter Note) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M380,256 m-22,0 a22,22 0,1 1,44 0 a22,22 0,1 1,-44 0" />
+</vector>

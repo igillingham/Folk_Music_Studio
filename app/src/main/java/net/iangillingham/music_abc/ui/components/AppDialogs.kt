@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 Ian Gillingham
+ * Licensed under the Open Source License
+ */
 package net.iangillingham.music_abc.ui.components
 
 import androidx.compose.foundation.layout.Column
@@ -106,6 +110,31 @@ fun SetupStorageDialog(
                 ) {
                     Text("Add Files (Google Drive)")
                 }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+fun AboutDialog(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("About") },
+        text = {
+            Column {
+                Text("Music ABC Notation Editor")
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Author: Ian Gillingham")
+                Text("Copyright © 2026 Ian Gillingham")
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("This application is open source and intended for viewing and editing ABC music notation files.")
             }
         },
         confirmButton = {

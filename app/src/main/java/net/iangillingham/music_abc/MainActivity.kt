@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 Ian Gillingham
+ * Licensed under the Open Source License
+ */
 package net.iangillingham.music_abc
 
 import android.content.Intent
@@ -106,6 +110,7 @@ fun Music_ABCApp() {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
     var showSetupDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTuneSelection by remember { mutableStateOf<AbcTune?>(null) }
     
     var isPlaying by remember { mutableStateOf(false) }
@@ -328,6 +333,7 @@ fun Music_ABCApp() {
                     scope.launch { drawerState.close() }
                 },
                 onSetupClick = { showSetupDialog = true },
+                onAboutClick = { showAboutDialog = true },
                 onRefresh = { refreshCount++ },
                 modifier = Modifier.width(leftPaneWidth.dp)
             )
@@ -543,6 +549,12 @@ fun Music_ABCApp() {
                             openFilesLauncher.launch(arrayOf("*/*")) 
                         },
                         onDismiss = { showSetupDialog = false }
+                    )
+                }
+
+                if (showAboutDialog) {
+                    AboutDialog(
+                        onDismiss = { showAboutDialog = false }
                     )
                 }
             }

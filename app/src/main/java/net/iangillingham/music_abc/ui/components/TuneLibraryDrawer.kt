@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 Ian Gillingham
+ * Licensed under the Open Source License
+ */
 package net.iangillingham.music_abc.ui.components
 
 import androidx.compose.foundation.clickable
@@ -21,11 +25,13 @@ fun TuneLibraryDrawer(
     onTuneSelected: (AbcTune) -> Unit,
     onNewTune: () -> Unit,
     onSetupClick: () -> Unit,
+    onAboutClick: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     ModalDrawerSheet(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp).fillMaxHeight()) {
+            // ... existing header ...
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -78,7 +84,7 @@ fun TuneLibraryDrawer(
             
             HorizontalDivider()
             
-            LazyColumn {
+            LazyColumn(modifier = Modifier.weight(1f)) {
                 items(parsedTunes) { tune ->
                     val isSelected = selectedTune == tune
                     Text(
@@ -94,6 +100,14 @@ fun TuneLibraryDrawer(
                         }
                     )
                 }
+            }
+
+            HorizontalDivider()
+            TextButton(
+                onClick = onAboutClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("About")
             }
         }
     }

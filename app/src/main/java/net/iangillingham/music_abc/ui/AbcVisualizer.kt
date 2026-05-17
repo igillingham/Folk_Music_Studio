@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 Ian Gillingham
+ * Licensed under the Open Source License
+ */
 package net.iangillingham.music_abc.ui
 
 import android.webkit.ConsoleMessage

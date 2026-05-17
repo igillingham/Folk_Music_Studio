@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -128,6 +129,7 @@ fun Music_ABCApp() {
     var showDiscardDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showUnsavedChangesDialog by remember { mutableStateOf(false) }
+    var showSetupDialog by remember { mutableStateOf(false) }
     var pendingTuneSelection by remember { mutableStateOf<AbcTune?>(null) }
     
     var isPlaying by remember { mutableStateOf(false) }
@@ -360,23 +362,21 @@ fun Music_ABCApp() {
                 modifier = Modifier.width(leftPaneWidth.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxHeight()) {
-                    Button(
-                        onClick = { openDirectoryLauncher.launch(null) },
+                    Row(
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Add Folder", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            "Tune Library",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { showSetupDialog = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Setup Storage")
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Button(
-                        onClick = { openFilesLauncher.launch(arrayOf("*/*")) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Add Files (Google Drive)", style = MaterialTheme.typography.labelMedium)
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Button(
                         onClick = { 
@@ -393,7 +393,7 @@ fun Music_ABCApp() {
                         Text("New Tune", style = MaterialTheme.typography.labelMedium)
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     Row(
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
@@ -683,6 +683,43 @@ fun Music_ABCApp() {
                         dismissButton = {
                             TextButton(onClick = { showUnsavedChangesDialog = false }) {
                                 Text("Keep Editing")
+                            }
+                        }
+                    )
+                }
+
+                if (showSetupDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSetupDialog = false },
+                        title = { Text("Setup Storage") },
+                        text = { 
+                            Column {
+                                Text("Add folders or specific files to your tune library.")
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(
+                                    onClick = { 
+                                        showSetupDialog = false
+                                        openDirectoryLauncher.launch(null) 
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Add Folder")
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { 
+                                        showSetupDialog = false
+                                        openFilesLauncher.launch(arrayOf("*/*")) 
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Add Files (Google Drive)")
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showSetupDialog = false }) {
+                                Text("Close")
                             }
                         }
                     )

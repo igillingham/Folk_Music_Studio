@@ -89,12 +89,20 @@ fun TuneLibraryDrawer(
                     val tune = parsedTunes[index]
                     val isSelected = selectedTune == tune
                     
-                    // Add a divider if this is not the first tune and it comes from a different file
-                    if (index > 0 && parsedTunes[index - 1].sourceUri != tune.sourceUri) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant
+                    // Add filename header and divider if file changes
+                    if (index == 0 || parsedTunes[index - 1].sourceUri != tune.sourceUri) {
+                        if (index > 0) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                thickness = 1.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        }
+                        Text(
+                            text = tune.sourceFileName,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp)
                         )
                     }
 
@@ -103,7 +111,7 @@ fun TuneLibraryDrawer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onTuneSelected(tune) }
-                            .padding(8.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         style = if (isSelected) {
                             MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.primary)
                         } else {

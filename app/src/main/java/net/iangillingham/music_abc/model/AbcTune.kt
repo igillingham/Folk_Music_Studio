@@ -10,5 +10,6 @@ data class AbcTune(
     val title: String,
     val content: String,
     val sourceUri: Uri,
+    val sourceFileName: String,
     val originalContent: String // Used to identify the tune in the file for replacement
 )

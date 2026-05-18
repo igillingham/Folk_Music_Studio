@@ -11,7 +11,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 
 object AbcHandler {
-    fun parseAbcContent(content: String, sourceUri: Uri): List<AbcTune> {
+    fun parseAbcContent(content: String, sourceUri: Uri, sourceFileName: String): List<AbcTune> {
         val tunes = mutableListOf<AbcTune>()
         val parts = content.split(Regex("(?m)^X:"))
         parts.forEach { part ->
@@ -19,10 +19,10 @@ object AbcHandler {
                 val fullTuneContent = "X:$part"
                 val titleMatch = Regex("(?m)^T:(.*)").find(fullTuneContent)
                 val title = titleMatch?.groupValues?.get(1)?.trim() ?: "Untitled"
-                tunes.add(AbcTune(title, fullTuneContent, sourceUri, fullTuneContent))
+                tunes.add(AbcTune(title, fullTuneContent, sourceUri, sourceFileName, fullTuneContent))
             }
         }
-        return tunes
+        return tunes.sortedBy { it.title.lowercase() }
     }
 
     fun saveTune(context: Context, tune: AbcTune, newContent: String): AbcTune? {

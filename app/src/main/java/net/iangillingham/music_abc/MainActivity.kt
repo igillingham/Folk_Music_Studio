@@ -163,7 +163,7 @@ fun Music_ABCApp() {
                 try {
                     context.contentResolver.openInputStream(file.uri)?.use { inputStream ->
                         val content = BufferedReader(InputStreamReader(inputStream)).readText()
-                        allParsedTunes.addAll(AbcHandler.parseAbcContent(content, file.uri))
+                        allParsedTunes.addAll(AbcHandler.parseAbcContent(content, file.uri, file.name ?: "Unknown"))
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()

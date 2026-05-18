@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 Ian Gillingham
- * Licensed under the Open Source License
+ * Licensed under the GNU General Public License v3.0
  */
 package net.iangillingham.music_abc.ui.components
 
@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -88,6 +89,7 @@ fun UnsavedChangesDialog(
 fun SetupStorageDialog(
     onAddFolder: () -> Unit,
     onAddFiles: () -> Unit,
+    onClearLibrary: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -95,7 +97,7 @@ fun SetupStorageDialog(
         title = { Text("Setup Storage") },
         text = { 
             Column {
-                Text("Add folders or specific files to your tune library.")
+                Text("Manage your tune library sources.")
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = onAddFolder,
@@ -109,6 +111,16 @@ fun SetupStorageDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Add Files (Google Drive)")
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(
+                    onClick = onClearLibrary,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Clear Library")
                 }
             }
         },
@@ -134,7 +146,7 @@ fun AboutDialog(
                 Text("Author: Ian Gillingham")
                 Text("Copyright © 2026 Ian Gillingham")
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("This application is open source and intended for viewing and editing ABC music notation files.")
+                Text("This application is free software released under the GNU GPL v3 license.")
             }
         },
         confirmButton = {

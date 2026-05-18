@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 Ian Gillingham
- * Licensed under the Open Source License
+ * Licensed under the GNU General Public License v3.0
  */
 package net.iangillingham.music_abc
 
@@ -547,6 +547,17 @@ fun Music_ABCApp() {
                         onAddFiles = { 
                             showSetupDialog = false
                             openFilesLauncher.launch(arrayOf("*/*")) 
+                        },
+                        onClearLibrary = {
+                            showSetupDialog = false
+                            directoryUri = null
+                            selectedFilesUris.clear()
+                            parsedTunes.clear()
+                            selectedTune = null
+                            selectedTuneTitle = null
+                            selectedTuneUri = null
+                            abcContent = ""
+                            prefs.edit().remove(KEY_DIRECTORY_URI).remove(KEY_SELECTED_FILES).apply()
                         },
                         onDismiss = { showSetupDialog = false }
                     )

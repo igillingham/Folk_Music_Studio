@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2026 Ian Gillingham
- * Licensed under the Open Source License
+ * Licensed under the GNU General Public License v3.0
  */
 package net.iangillingham.music_abc.ui.components
 
@@ -85,8 +85,19 @@ fun TuneLibraryDrawer(
             HorizontalDivider()
             
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(parsedTunes) { tune ->
+                items(parsedTunes.size) { index ->
+                    val tune = parsedTunes[index]
                     val isSelected = selectedTune == tune
+                    
+                    // Add a divider if this is not the first tune and it comes from a different file
+                    if (index > 0 && parsedTunes[index - 1].sourceUri != tune.sourceUri) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                    }
+
                     Text(
                         text = tune.title,
                         modifier = Modifier

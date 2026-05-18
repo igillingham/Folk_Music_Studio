@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2026 Ian Gillingham
+ * Licensed under the GNU General Public License v3.0
+ */
 package net.iangillingham.music_abc.model
 
 import android.net.Uri

@@ -22,11 +22,11 @@ import net.iangillingham.music_abc.model.AbcTune
 val PastelColors = listOf(
     Color(0xFFE3F2FD), // Light Blue
     Color(0xFFE8F5E9), // Light Green
-    Color(0xFFFFEBEE), // Light Red
+    Color(0xFFfcb8b8), // Light Red
     Color(0xFFFFF9C4), // Light Yellow
     Color(0xFFF3E5F5), // Light Lavender
-    Color(0xFFFFF3E0), // Light Orange
-    Color(0xFFE0F7FA), // Light Cyan
+    Color(0xFFFFc18a), // Light Orange
+    Color(0xFFb9fcfc), // Light Cyan
 )
 
 @Composable

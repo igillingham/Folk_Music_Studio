@@ -4,16 +4,25 @@
  */
 package net.iangillingham.music_abc.ui.components
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import net.iangillingham.music_abc.model.AbcTune
@@ -152,6 +161,90 @@ fun AboutDialog(
         confirmButton = {
             TextButton(onClick = onDismiss) {
                 Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+fun BulkDeleteConfirmationDialog(
+    count: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete Multiple Tunes") },
+        text = { Text("Are you sure you want to permanently delete $count selected tunes from their source files?") },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun DuplicateTuneDialog(
+    tuneTitle: String,
+    onOverwrite: () -> Unit,
+    onSkip: () -> Unit,
+    onCancel: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Tune Already Exists") },
+        text = { Text("The tune '$tuneTitle' already exists in the target file. Would you like to overwrite it or skip it?") },
+        confirmButton = {
+            Row {
+                TextButton(onClick = onOverwrite) {
+                    Text("Overwrite")
+                }
+                TextButton(onClick = onSkip) {
+                    Text("Skip")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun CopyTargetChoiceDialog(
+    onNewFile: () -> Unit,
+    onExistingFile: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Copy Tunes") },
+        text = { Text("Do you want to copy the selected tunes to a new file or append them to an existing file?") },
+        confirmButton = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onNewFile, modifier = Modifier.fillMaxWidth()) {
+                    Text("Create New File")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = onExistingFile, modifier = Modifier.fillMaxWidth()) {
+                    Text("Select Existing File")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )

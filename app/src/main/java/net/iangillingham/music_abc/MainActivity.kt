@@ -62,6 +62,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import net.iangillingham.music_abc.logic.AbcHandler
 import net.iangillingham.music_abc.model.AbcTune
@@ -112,6 +113,13 @@ fun Music_ABCApp() {
     var showSetupDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTuneSelection by remember { mutableStateOf<AbcTune?>(null) }
+    
+    // Multi-selection states
+    var selectionMode by rememberSaveable { mutableStateOf(false) }
+    val selectedTunes = remember { mutableStateListOf<AbcTune>() }
+    var showBulkDeleteDialog by remember { mutableStateOf(false) }
+    var showCopyTargetChoiceDialog by remember { mutableStateOf(false) }
+    var duplicateTuneRequest by remember { mutableStateOf<Pair<AbcTune, CompletableDeferred<Boolean?>>?>(null) }
     
     var isPlaying by remember { mutableStateOf(false) }
     var isPaused by remember { mutableStateOf(false) }
@@ -242,6 +250,51 @@ fun Music_ABCApp() {
         }
     }
 
+    // New launchers for bulk copy
+    val createTargetFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                AbcHandler.copyTunesToFile(
+                    context,
+                    selectedTunes.toList(),
+                    it,
+                    onDuplicateFound = { tune ->
+                        val deferred = CompletableDeferred<Boolean?>()
+                        duplicateTuneRequest = Pair(tune, deferred)
+                        deferred.await()
+                    }
+                )
+                selectionMode = false
+                selectedTunes.clear()
+                refreshCount++
+            }
+        }
+    }
+
+    val selectTargetFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            scope.launch {
+                AbcHandler.copyTunesToFile(
+                    context,
+                    selectedTunes.toList(),
+                    it,
+                    onDuplicateFound = { tune ->
+                        val deferred = CompletableDeferred<Boolean?>()
+                        duplicateTuneRequest = Pair(tune, deferred)
+                        deferred.await()
+                    }
+                )
+                selectionMode = false
+                selectedTunes.clear()
+                refreshCount++
+            }
+        }
+    }
+
     val createNewFileLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
@@ -301,6 +354,8 @@ fun Music_ABCApp() {
                 parsedTunes = parsedTunes,
                 selectedTune = selectedTune,
                 isLoadingFiles = isLoadingFiles,
+                selectionMode = selectionMode,
+                selectedTunes = selectedTunes.toSet(),
                 onTuneSelected = { tune ->
                     val hasChanges = if (isCreatingNewTune) {
                         abcContent != "X:1\nT:New Tune\nM:4/4\nL:1/4\nK:C\n"
@@ -323,6 +378,15 @@ fun Music_ABCApp() {
                         scope.launch { drawerState.close() }
                     }
                 },
+                onSelectionModeToggle = { enabled ->
+                    selectionMode = enabled
+                    if (!enabled) selectedTunes.clear()
+                },
+                onSelectionChange = { tune, selected ->
+                    if (selected) selectedTunes.add(tune) else selectedTunes.remove(tune)
+                },
+                onBulkDelete = { showBulkDeleteDialog = true },
+                onBulkCopy = { showCopyTargetChoiceDialog = true },
                 onNewTune = { 
                     isCreatingNewTune = true
                     selectedTune = null
@@ -566,6 +630,54 @@ fun Music_ABCApp() {
                 if (showAboutDialog) {
                     AboutDialog(
                         onDismiss = { showAboutDialog = false }
+                    )
+                }
+
+                if (showBulkDeleteDialog) {
+                    BulkDeleteConfirmationDialog(
+                        count = selectedTunes.size,
+                        onConfirm = {
+                            showBulkDeleteDialog = false
+                            scope.launch {
+                                AbcHandler.deleteTunes(context, selectedTunes.toList())
+                                selectionMode = false
+                                selectedTunes.clear()
+                                refreshCount++
+                            }
+                        },
+                        onDismiss = { showBulkDeleteDialog = false }
+                    )
+                }
+
+                if (showCopyTargetChoiceDialog) {
+                    CopyTargetChoiceDialog(
+                        onNewFile = {
+                            showCopyTargetChoiceDialog = false
+                            createTargetFileLauncher.launch("selected_tunes.abc")
+                        },
+                        onExistingFile = {
+                            showCopyTargetChoiceDialog = false
+                            selectTargetFileLauncher.launch(arrayOf("*/*"))
+                        },
+                        onDismiss = { showCopyTargetChoiceDialog = false }
+                    )
+                }
+
+                duplicateTuneRequest?.let { (tune, deferred) ->
+                    DuplicateTuneDialog(
+                        tuneTitle = tune.title,
+                        onOverwrite = {
+                            duplicateTuneRequest = null
+                            deferred.complete(true)
+                        },
+                        onSkip = {
+                            duplicateTuneRequest = null
+                            deferred.complete(false)
+                        },
+                        onCancel = {
+                            duplicateTuneRequest = null
+                            deferred.complete(null)
+                        }
                     )
                 }
             }

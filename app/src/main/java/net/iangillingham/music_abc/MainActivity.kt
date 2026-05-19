@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -113,6 +114,7 @@ fun Music_ABCApp() {
     var showSetupDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTuneSelection by remember { mutableStateOf<AbcTune?>(null) }
+    var reopenSetupAfterPickerCancel by remember { mutableStateOf(false) }
     
     // Multi-selection states
     var selectionMode by rememberSaveable { mutableStateOf(false) }
@@ -218,16 +220,23 @@ fun Music_ABCApp() {
     val openDirectoryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
-        uri?.let {
+        if (uri == null) {
+            if (reopenSetupAfterPickerCancel) {
+                showSetupDialog = true
+            }
+            reopenSetupAfterPickerCancel = false
+        } else {
             try {
                 context.contentResolver.takePersistableUriPermission(
-                    it,
+                    uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
-                prefs.edit().putString(KEY_DIRECTORY_URI, it.toString()).apply()
-                directoryUri = it.toString()
+                prefs.edit().putString(KEY_DIRECTORY_URI, uri.toString()).apply()
+                directoryUri = uri.toString()
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                reopenSetupAfterPickerCancel = false
             }
         }
     }
@@ -235,18 +244,26 @@ fun Music_ABCApp() {
     val openFilesLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
-        uris.forEach { uri ->
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                )
-                if (!selectedFilesUris.contains(uri.toString())) {
-                    selectedFilesUris.add(uri.toString())
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+        if (uris.isEmpty()) {
+            if (reopenSetupAfterPickerCancel) {
+                showSetupDialog = true
             }
+            reopenSetupAfterPickerCancel = false
+        } else {
+            uris.forEach { uri ->
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                    if (!selectedFilesUris.contains(uri.toString())) {
+                        selectedFilesUris.add(uri.toString())
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            reopenSetupAfterPickerCancel = false
         }
     }
 
@@ -505,11 +522,10 @@ fun Music_ABCApp() {
                     if (abcContent.isEmpty() && !isCreatingNewTune) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
                             Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                                Icon(
+                                Image(
                                     painter = painterResource(id = R.drawable.ic_app_logo),
                                     contentDescription = "App Logo",
-                                    modifier = Modifier.size(128.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    modifier = Modifier.size(128.dp)
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 if (directoryUri == null && selectedFilesUris.isEmpty()) {
@@ -605,14 +621,17 @@ fun Music_ABCApp() {
                 if (showSetupDialog) {
                     SetupStorageDialog(
                         onAddFolder = { 
+                            reopenSetupAfterPickerCancel = true
                             showSetupDialog = false
                             openDirectoryLauncher.launch(null) 
                         },
                         onAddFiles = { 
+                            reopenSetupAfterPickerCancel = true
                             showSetupDialog = false
                             openFilesLauncher.launch(arrayOf("*/*")) 
                         },
                         onClearLibrary = {
+                            reopenSetupAfterPickerCancel = false
                             showSetupDialog = false
                             directoryUri = null
                             selectedFilesUris.clear()

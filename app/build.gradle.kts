@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "net.iangillingham.music_abc"
+    namespace = "net.iangillingham.folkmusicstudio"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -12,7 +12,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "net.iangillingham.music_abc"
+        applicationId = "net.iangillingham.folkmusicstudio"
         minSdk = 36
         targetSdk = 36
         versionCode = 1
@@ -36,6 +36,15 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val versionName = output.versionName.get()
+            output.outputFileName.set("FolkMusicStudio-$versionName-${variant.name}.apk")
+        }
     }
 }
 

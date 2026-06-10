@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Ian Gillingham
  * Licensed under the GNU General Public License v3.0
  */
-package net.iangillingham.music_abc
+package net.iangillingham.folkmusicstudio
 
 import android.content.Intent
 import android.net.Uri
@@ -65,15 +65,15 @@ import androidx.compose.ui.unit.dp
 import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
-import net.iangillingham.music_abc.logic.AbcHandler
-import net.iangillingham.music_abc.model.AbcTune
-import net.iangillingham.music_abc.ui.AbcVisualizer
-import net.iangillingham.music_abc.ui.components.*
-import net.iangillingham.music_abc.ui.theme.Music_ABCTheme
+import net.iangillingham.folkmusicstudio.logic.AbcHandler
+import net.iangillingham.folkmusicstudio.model.AbcTune
+import net.iangillingham.folkmusicstudio.ui.AbcVisualizer
+import net.iangillingham.folkmusicstudio.ui.components.*
+import net.iangillingham.folkmusicstudio.ui.theme.FolkMusicStudioTheme
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-private const val PREFS_NAME = "MusicAbcPrefs"
+private const val PREFS_NAME = "FolkMusicStudioPrefs"
 private const val KEY_DIRECTORY_URI = "directoryUri"
 private const val KEY_SELECTED_FILES = "selectedFiles"
 
@@ -83,8 +83,8 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
         setContent {
-            Music_ABCTheme {
-                Music_ABCApp()
+            FolkMusicStudioTheme {
+                FolkMusicStudioApp()
             }
         }
     }
@@ -92,7 +92,7 @@ class MainActivity : ComponentActivity() {
 
 @PreviewScreenSizes
 @Composable
-fun Music_ABCApp() {
+fun FolkMusicStudioApp() {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE) }
     

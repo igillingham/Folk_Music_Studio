@@ -1,4 +1,4 @@
-package net.iangillingham.music_abc
+package net.iangillingham.folkmusicstudio
 
 import org.junit.Test
 

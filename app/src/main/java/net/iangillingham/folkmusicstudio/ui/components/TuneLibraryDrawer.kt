@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Ian Gillingham
  * Licensed under the GNU General Public License v3.0
  */
-package net.iangillingham.music_abc.ui.components
+package net.iangillingham.folkmusicstudio.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,7 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import net.iangillingham.music_abc.model.AbcTune
+import net.iangillingham.folkmusicstudio.model.AbcTune
 
 val PastelColors = listOf(
     Color(0xFFF0F7FF), // Extremely Light Blue

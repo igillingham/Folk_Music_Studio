@@ -1,3 +1,4 @@
+
 Anyone visiting my GitHub repository can click on the Releases tab, download the .apk file, and install it. However, because it isn't coming from the Google Play Store, you will need to follow these steps on your Android device:
 
 1) Download: Open the GitHub release link on their Android device and download the .apk file.

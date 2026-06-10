@@ -1,4 +1,4 @@
-package net.iangillingham.music_abc.ui.theme
+package net.iangillingham.folkmusicstudio.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

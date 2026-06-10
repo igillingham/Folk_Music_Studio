@@ -2,11 +2,11 @@
  * Copyright (c) 2026 Ian Gillingham
  * Licensed under the GNU General Public License v3.0
  */
-package net.iangillingham.music_abc.logic
+package net.iangillingham.folkmusicstudio.logic
 
 import android.content.Context
 import android.net.Uri
-import net.iangillingham.music_abc.model.AbcTune
+import net.iangillingham.folkmusicstudio.model.AbcTune
 import java.io.BufferedReader
 import java.io.InputStreamReader
 

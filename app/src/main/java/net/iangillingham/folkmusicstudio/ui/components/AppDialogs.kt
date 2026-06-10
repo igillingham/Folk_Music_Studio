@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Ian Gillingham
  * Licensed under the GNU General Public License v3.0
  */
-package net.iangillingham.music_abc.ui.components
+package net.iangillingham.folkmusicstudio.ui.components
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import net.iangillingham.music_abc.model.AbcTune
+import net.iangillingham.folkmusicstudio.model.AbcTune
 
 @Composable
 fun DiscardEditsDialog(

@@ -1,11 +1,15 @@
 # Introduction
-In my endeavours to find an android app to read ABC notation files, list the yunes in those files and 
+In my endeavours to find an android app to read ABC notation files, list the tunes in those files and 
 render the dots, it became clear that there is very little of note out there.
 So, I decided to sit down and write my own android app to provide all the functionality that I'm
 looking for.
 
 This app is primarily targeted at, but not limited to folk musicians, with a need to store, 
 retrieve and share music with others at sessions and gigs. 
+
+The application and all source code is open source under the GPL-3.0 licence. 
+There will never be a fee or ads, just a quality app which I hope will be helpful to fellow musicians.
+
 
 # Functionality
 This includes:

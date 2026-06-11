@@ -65,7 +65,7 @@ Tap any tune in the library to display the sheet music. The app automatically re
 
 ### Live Editor
 Tap the **Edit** (Pencil) icon to open the editor.
-- The screen splits into two: the notation on top and the text editor below.
+- **Adaptive Layout**: On phones, the screen automatically adjusts. In portrait, the notation is on top and the editor below. In landscape, they appear side-by-side for better use of space.
 - Changes made in the text editor are updated in the notation in real-time.
 - Tap the **Save** icon to commit changes to the source file.
 

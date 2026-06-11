@@ -21,6 +21,7 @@ fun AbcVisualizer(
     isPlaying: Boolean = false,
     isPaused: Boolean = false,
     tempo: Int = 120,
+    playRepeats: Boolean = true,
     onTempoDetected: (Int) -> Unit = {}
 ) {
     val escapedAbc = abcCode.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
@@ -30,7 +31,7 @@ fun AbcVisualizer(
         <!DOCTYPE html>
         <html>
         <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
             <script src="file:///android_asset/abcjs-basic-min.js" type="text/javascript"></script>
             <style>
                 body { margin: 0; padding: 10px; font-family: sans-serif; background-color: white; }
@@ -111,19 +112,27 @@ fun AbcVisualizer(
                                 }
                             }
                         }
+
+                        // If we should be playing, trigger it now that visualObj is ready
+                        if (window.shouldBePlaying) {
+                            play(window.pendingBpm || 120, window.pendingPlayRepeats);
+                        }
                     } catch (e) {
                         document.getElementById("errors").innerHTML = "Render error: " + e.message;
                     }
                 }
 
-                async function play(bpm) {
+                async function play(bpm, playRepeats) {
+                    window.shouldBePlaying = true;
+                    window.pendingBpm = bpm;
+                    window.pendingPlayRepeats = playRepeats;
+
                     if (!visualObj || !visualObj[0] || isInitializing) return;
                     
                     const seekToBeat = currentBeat;
 
-                    // If tempo changed while playing, we need to restart the synth
-                    // but we'll use a small threshold to avoid jitter
-                    if (synthControl && Math.abs(bpm - currentBpm) > 1) {
+                    // If tempo or repeat setting changed while playing, we need to restart the synth
+                    if (synthControl && (Math.abs(bpm - currentBpm) > 1 || playRepeats !== window.currentPlayRepeats)) {
                         synthControl.stop();
                         synthControl = null;
                         if (timingCallbacks) {
@@ -132,9 +141,10 @@ fun AbcVisualizer(
                         }
                     }
 
-                    if (isPlaying(synthControl) && bpm === currentBpm) return;
+                    if (isPlaying(synthControl) && bpm === currentBpm && playRepeats === window.currentPlayRepeats) return;
 
                     currentBpm = bpm;
+                    window.currentPlayRepeats = playRepeats;
 
                     try {
                         if (!audioContext) {
@@ -144,6 +154,8 @@ fun AbcVisualizer(
                             await audioContext.resume();
                         }
                         
+                        if (!window.shouldBePlaying) return;
+
                         if (!synthControl) {
                             isInitializing = true;
                             synthControl = new ABCJS.synth.CreateSynth();
@@ -153,10 +165,26 @@ fun AbcVisualizer(
                             await synthControl.init({
                                 audioContext: audioContext,
                                 visualObj: visualObj[0],
-                                millisecondsPerMeasure: msPerMeasure
+                                millisecondsPerMeasure: msPerMeasure,
+                                options: {
+                                    noRepeats: !playRepeats
+                                }
                             });
+                            
+                            if (!window.shouldBePlaying) {
+                                isInitializing = false;
+                                synthControl = null;
+                                return;
+                            }
+
                             await synthControl.prime();
                             
+                            if (!window.shouldBePlaying) {
+                                isInitializing = false;
+                                synthControl = null;
+                                return;
+                            }
+
                             if (seekToBeat > 0) {
                                 await synthControl.seek(seekToBeat, "beats");
                             }
@@ -178,8 +206,10 @@ fun AbcVisualizer(
                             });
                         }
 
-                        synthControl.start();
-                        timingCallbacks.start();
+                        if (window.shouldBePlaying) {
+                            synthControl.start();
+                            timingCallbacks.start();
+                        }
                     } catch (e) {
                         isInitializing = false;
                         document.getElementById("errors").innerHTML = "Audio error: " + e.message;
@@ -191,18 +221,24 @@ fun AbcVisualizer(
                 }
 
                 function pause() {
+                    window.shouldBePlaying = false;
                     if (synthControl) synthControl.pause();
                     if (timingCallbacks) timingCallbacks.pause();
                 }
 
                 function stop() {
+                    console.log("Stopping playback");
+                    window.shouldBePlaying = false;
                     if (synthControl) {
                         synthControl.stop();
-                        synthControl = null; // Ensure fresh start next time
+                        synthControl = null;
                     }
                     if (timingCallbacks) {
                         timingCallbacks.stop();
                         timingCallbacks = null;
+                    }
+                    if (audioContext) {
+                        audioContext.suspend();
                     }
                     currentBeat = 0;
                 }
@@ -218,6 +254,9 @@ fun AbcVisualizer(
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
                 settings.allowFileAccess = true
+                settings.setSupportZoom(true)
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
                 addJavascriptInterface(object {
                     @android.webkit.JavascriptInterface
                     fun onTempoDetected(bpm: Int) {
@@ -248,11 +287,19 @@ fun AbcVisualizer(
                 if (isPaused) {
                     webView.evaluateJavascript("if (typeof pause === 'function') pause();", null)
                 } else {
-                    webView.evaluateJavascript("if (typeof play === 'function') play(${tempo});", null)
+                    webView.evaluateJavascript("window.shouldBePlaying = true; if (typeof play === 'function') play(${tempo}, ${playRepeats});", null)
                 }
             } else {
-                webView.evaluateJavascript("if (typeof stop === 'function') stop();", null)
+                webView.evaluateJavascript("window.shouldBePlaying = false; if (typeof stop === 'function') stop();", null)
             }
+        },
+        onRelease = { webView ->
+            android.util.Log.d("AbcVisualizer", "Releasing WebView")
+            webView.evaluateJavascript("window.shouldBePlaying = false; if (typeof stop === 'function') stop();", null)
+            webView.stopLoading()
+            webView.loadUrl("about:blank")
+            webView.onPause()
+            webView.destroy()
         },
         modifier = modifier
     )

@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOn
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
@@ -53,6 +55,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -128,8 +131,9 @@ fun FolkMusicStudioApp() {
     var showCopyTargetChoiceDialog by remember { mutableStateOf(false) }
     var duplicateTuneRequest by remember { mutableStateOf<Pair<AbcTune, CompletableDeferred<Boolean?>>?>(null) }
     
-    var isPlaying by remember { mutableStateOf(false) }
-    var isPaused by remember { mutableStateOf(false) }
+    var isPlaying by rememberSaveable { mutableStateOf(false) }
+    var isPaused by rememberSaveable { mutableStateOf(false) }
+    var playRepeats by rememberSaveable { mutableStateOf(true) }
     var tempo by rememberSaveable { mutableStateOf(120f) }
     var activeTempo by rememberSaveable { mutableStateOf(120f) }
     
@@ -505,6 +509,14 @@ fun FolkMusicStudioApp() {
                                             Icon(Icons.Default.Stop, contentDescription = "Stop")
                                         }
 
+                                        IconButton(onClick = { playRepeats = !playRepeats }) {
+                                            Icon(
+                                                if (playRepeats) Icons.Default.Repeat else Icons.Default.RepeatOn,
+                                                contentDescription = if (playRepeats) "Disable Repeats" else "Enable Repeats",
+                                                tint = if (playRepeats) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                            )
+                                        }
+
                                         // Tempo Slider
                                         Spacer(modifier = Modifier.width(16.dp))
                                         Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
@@ -602,6 +614,14 @@ fun FolkMusicStudioApp() {
                                             Icon(Icons.Default.Stop, contentDescription = "Stop")
                                         }
 
+                                        IconButton(onClick = { playRepeats = !playRepeats }) {
+                                            Icon(
+                                                if (playRepeats) Icons.Default.Repeat else Icons.Default.RepeatOn,
+                                                contentDescription = if (playRepeats) "Disable Repeats" else "Enable Repeats",
+                                                tint = if (playRepeats) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                            )
+                                        }
+
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column(
                                             modifier = Modifier.weight(1f),
@@ -641,28 +661,34 @@ fun FolkMusicStudioApp() {
                             }
                         }
                     } else if (showPreview) {
-                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
-                            onTempoDetected = { detectedBpm ->
-                                // Use detected BPM if Q: field exists, otherwise default to 120
-                                val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
-                                val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
-                                tempo = finalBpm.toFloat()
-                                activeTempo = finalBpm.toFloat()
-                            },
-                            modifier = Modifier.fillMaxSize())
+                        key("shared_visualizer") {
+                            AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
+                                playRepeats = playRepeats,
+                                onTempoDetected = { detectedBpm ->
+                                    // Use detected BPM if Q: field exists, otherwise default to 120
+                                    val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
+                                    val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
+                                    tempo = finalBpm.toFloat()
+                                    activeTempo = finalBpm.toFloat()
+                                },
+                                modifier = Modifier.fillMaxSize())
+                        }
                     } else {
                         if (isLandscape && isCompact) {
                             Row(modifier = Modifier.fillMaxSize()) {
                                 // Left pane: Rendered notation
                                 Box(modifier = Modifier.weight(1f)) {
-                                    AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
-                                        onTempoDetected = { detectedBpm ->
-                                            val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
-                                            val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
-                                            tempo = finalBpm.toFloat()
-                                            activeTempo = finalBpm.toFloat()
-                                        },
-                                        modifier = Modifier.fillMaxSize())
+                                    key("shared_visualizer") {
+                                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
+                                            playRepeats = playRepeats,
+                                            onTempoDetected = { detectedBpm ->
+                                                val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
+                                                val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
+                                                tempo = finalBpm.toFloat()
+                                                activeTempo = finalBpm.toFloat()
+                                            },
+                                            modifier = Modifier.fillMaxSize())
+                                    }
                                 }
                                 
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -680,14 +706,17 @@ fun FolkMusicStudioApp() {
                             Column(modifier = Modifier.fillMaxSize()) {
                                 // Top half: Rendered notation
                                 Box(modifier = Modifier.weight(if (isCompact) 0.4f else 1f)) {
-                                    AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
-                                        onTempoDetected = { detectedBpm ->
-                                            val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
-                                            val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
-                                            tempo = finalBpm.toFloat()
-                                            activeTempo = finalBpm.toFloat()
-                                        },
-                                        modifier = Modifier.fillMaxSize())
+                                    key("shared_visualizer") {
+                                        AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
+                                            playRepeats = playRepeats,
+                                            onTempoDetected = { detectedBpm ->
+                                                val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
+                                                val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
+                                                tempo = finalBpm.toFloat()
+                                                activeTempo = finalBpm.toFloat()
+                                            },
+                                            modifier = Modifier.fillMaxSize())
+                                    }
                                 }
                             
                                 HorizontalDivider(
@@ -817,6 +846,14 @@ fun FolkMusicStudioApp() {
                                         isPaused = false
                                     }, enabled = isPlaying) {
                                         Icon(Icons.Default.Stop, contentDescription = "Stop")
+                                    }
+
+                                    IconButton(onClick = { playRepeats = !playRepeats }) {
+                                        Icon(
+                                            if (playRepeats) Icons.Default.Repeat else Icons.Default.RepeatOn,
+                                            contentDescription = if (playRepeats) "Disable Repeats" else "Enable Repeats",
+                                            tint = if (playRepeats) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                        )
                                     }
                                 }
                             }

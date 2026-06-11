@@ -5,6 +5,7 @@
 package net.iangillingham.folkmusicstudio
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,6 +28,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.Image
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
@@ -58,6 +62,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
@@ -421,101 +426,201 @@ fun FolkMusicStudioApp() {
         }
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            // Main Content
-            Column(modifier = Modifier
+            val configuration = LocalConfiguration.current
+            val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val isCompact = configuration.smallestScreenWidthDp < 600
+            val isSideToolbar = isCompact && isLandscape
+            val showTwoRowToolbar = isCompact && !isLandscape
+            val showTopToolbar = !isSideToolbar
+
+            // Main Content Wrapper
+            Row(modifier = Modifier
                 .padding(innerPadding)
                 .imePadding() // Resizes layout to keep content above keyboard
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(if (isSideToolbar) 8.dp else 16.dp)
             ) {
-                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
-                        }
-                        
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        if (isCreatingNewTune) {
-                            Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
-                                Text("Save New")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
-                                Text("Append")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(onClick = { 
-                                showDiscardDialog = true
-                            }) {
-                                Text("Cancel")
-                            }
-                        } else if (selectedTune != null) {
-                            val hasChanges = abcContent != selectedTune?.content
-                            IconButton(
-                                onClick = { saveTune(selectedTune!!, abcContent) },
-                                enabled = hasChanges
+                Column(modifier = Modifier.weight(1f)) {
+                    if (showTopToolbar) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Default.Save, 
-                                    contentDescription = "Save",
-                                    tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            IconButton(onClick = { showDeleteDialog = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete")
-                            }
-                            
-                            // Playback controls
-                            Spacer(modifier = Modifier.width(16.dp))
-                            IconButton(onClick = { 
-                                isPlaying = true
-                                isPaused = false
-                            }, enabled = !isPlaying || isPaused) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = "Play")
-                            }
-                            IconButton(onClick = { 
-                                isPaused = true
-                            }, enabled = isPlaying && !isPaused) {
-                                Icon(Icons.Default.Pause, contentDescription = "Pause")
-                            }
-                            IconButton(onClick = { 
-                                isPlaying = false
-                                isPaused = false
-                            }, enabled = isPlaying) {
-                                Icon(Icons.Default.Stop, contentDescription = "Stop")
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
+                                }
+
+                                if (!showTwoRowToolbar) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    if (isCreatingNewTune) {
+                                        Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
+                                            Text("Save New")
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
+                                            Text("Append")
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Button(onClick = {
+                                            showDiscardDialog = true
+                                        }) {
+                                            Text("Cancel")
+                                        }
+                                    } else if (selectedTune != null) {
+                                        val hasChanges = abcContent != selectedTune?.content
+                                        IconButton(
+                                            onClick = { saveTune(selectedTune!!, abcContent) },
+                                            enabled = hasChanges
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Save,
+                                                contentDescription = "Save",
+                                                tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        IconButton(onClick = { showDeleteDialog = true }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                        }
+
+                                        // Playback controls
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        IconButton(onClick = {
+                                            isPlaying = true
+                                            isPaused = false
+                                        }, enabled = !isPlaying || isPaused) {
+                                            Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                                        }
+                                        IconButton(onClick = {
+                                            isPaused = true
+                                        }, enabled = isPlaying && !isPaused) {
+                                            Icon(Icons.Default.Pause, contentDescription = "Pause")
+                                        }
+                                        IconButton(onClick = {
+                                            isPlaying = false
+                                            isPaused = false
+                                        }, enabled = isPlaying) {
+                                            Icon(Icons.Default.Stop, contentDescription = "Stop")
+                                        }
+
+                                        // Tempo Slider
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = tempo.toInt().toString(),
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                            Slider(
+                                                value = tempo,
+                                                onValueChange = {
+                                                    tempo = it
+                                                },
+                                                onValueChangeFinished = {
+                                                    activeTempo = tempo
+                                                },
+                                                valueRange = 40f..200f,
+                                                modifier = Modifier.width(150.dp)
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    // Row 1 content for compact portrait
+                                    if (isCreatingNewTune) {
+                                        Text("New Tune", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 8.dp))
+                                    } else if (selectedTune != null) {
+                                        val hasChanges = abcContent != selectedTune?.content
+                                        IconButton(
+                                            onClick = { saveTune(selectedTune!!, abcContent) },
+                                            enabled = hasChanges
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Save,
+                                                contentDescription = "Save",
+                                                tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                            )
+                                        }
+                                        IconButton(onClick = { showDeleteDialog = true }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.weight(1f))
+                                IconButton(onClick = {
+                                    isPlaying = false
+                                    isPaused = false
+                                    showPreview = !showPreview
+                                }, modifier = Modifier.padding(start = 8.dp)) {
+                                    Icon(
+                                        if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
+                                        contentDescription = if (showPreview) "Edit" else "View"
+                                    )
+                                }
                             }
 
-                            // Tempo Slider
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                                Text(
-                                    text = tempo.toInt().toString(),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                                Slider(
-                                    value = tempo,
-                                    onValueChange = { 
-                                        tempo = it
-                                    },
-                                    onValueChangeFinished = {
-                                        activeTempo = tempo
-                                    },
-                                    valueRange = 40f..200f,
-                                    modifier = Modifier.width(150.dp)
-                                )
+                            if (showTwoRowToolbar) {
+                                if (isCreatingNewTune) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                    ) {
+                                        Button(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
+                                            Text("Save New", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Button(onClick = { appendToFileLauncher.launch(arrayOf("*/*")) }) {
+                                            Text("Append", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Button(onClick = { showDiscardDialog = true }) {
+                                            Text("Cancel", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                } else if (selectedTune != null) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                    ) {
+                                        IconButton(onClick = {
+                                            isPlaying = true
+                                            isPaused = false
+                                        }, enabled = !isPlaying || isPaused) {
+                                            Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                                        }
+                                        IconButton(onClick = {
+                                            isPaused = true
+                                        }, enabled = isPlaying && !isPaused) {
+                                            Icon(Icons.Default.Pause, contentDescription = "Pause")
+                                        }
+                                        IconButton(onClick = {
+                                            isPlaying = false
+                                            isPaused = false
+                                        }, enabled = isPlaying) {
+                                            Icon(Icons.Default.Stop, contentDescription = "Stop")
+                                        }
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = "Tempo: ${tempo.toInt()}",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                            Slider(
+                                                value = tempo,
+                                                onValueChange = { tempo = it },
+                                                onValueChangeFinished = { activeTempo = tempo },
+                                                valueRange = 40f..200f
+                                            )
+                                        }
+                                    }
+                                }
                             }
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        IconButton(onClick = { 
-                            isPlaying = false
-                            isPaused = false
-                            showPreview = !showPreview 
-                        }, modifier = Modifier.padding(start = 8.dp)) {
-                            Icon(
-                                if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
-                                contentDescription = if (showPreview) "Edit" else "View"
-                            )
                         }
                     }
 
@@ -546,35 +651,179 @@ fun FolkMusicStudioApp() {
                             },
                             modifier = Modifier.fillMaxSize())
                     } else {
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            // Top half: Rendered notation
-                            Box(modifier = Modifier.weight(1f)) {
-                                AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
-                                    onTempoDetected = { detectedBpm ->
-                                        val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
-                                        val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
-                                        tempo = finalBpm.toFloat()
-                                        activeTempo = finalBpm.toFloat()
-                                    },
-                                    modifier = Modifier.fillMaxSize())
+                        if (isLandscape && isCompact) {
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                // Left pane: Rendered notation
+                                Box(modifier = Modifier.weight(1f)) {
+                                    AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
+                                        onTempoDetected = { detectedBpm ->
+                                            val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
+                                            val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
+                                            tempo = finalBpm.toFloat()
+                                            activeTempo = finalBpm.toFloat()
+                                        },
+                                        modifier = Modifier.fillMaxSize())
+                                }
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                // Right pane: ABC Notation Editor
+                                TextField(
+                                    value = abcContent,
+                                    onValueChange = { abcContent = it },
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    label = { Text("Editor") },
+                                    textStyle = MaterialTheme.typography.bodySmall
+                                )
                             }
-                        
-                        // Visible horizontal line
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            thickness = 2.dp,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                        
-                        // Bottom half: ABC Notation Editor
-                        TextField(
-                            value = abcContent,
-                            onValueChange = { abcContent = it },
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            label = { Text("ABC Notation Editor") }
-                        )
+                        } else {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                // Top half: Rendered notation
+                                Box(modifier = Modifier.weight(if (isCompact) 0.4f else 1f)) {
+                                    AbcVisualizer(abcContent, isPlaying = isPlaying, isPaused = isPaused, tempo = activeTempo.toInt(), 
+                                        onTempoDetected = { detectedBpm ->
+                                            val hasExplicitTempo = abcContent.contains(Regex("(?m)^Q:"))
+                                            val finalBpm = if (hasExplicitTempo) detectedBpm.coerceIn(40, 200) else 120
+                                            tempo = finalBpm.toFloat()
+                                            activeTempo = finalBpm.toFloat()
+                                        },
+                                        modifier = Modifier.fillMaxSize())
+                                }
+                            
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    thickness = 2.dp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                
+                                // Bottom half: ABC Notation Editor
+                                TextField(
+                                    value = abcContent,
+                                    onValueChange = { abcContent = it },
+                                    modifier = Modifier.weight(if (isCompact) 0.6f else 1f).fillMaxWidth(),
+                                    label = { Text("Editor") },
+                                    textStyle = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
                     }
                 }
+
+                if (isSideToolbar) {
+                    androidx.compose.material3.Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .width(110.dp)
+                            .fillMaxHeight()
+                            .padding(start = 8.dp),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly
+                        ) {
+                            // Left Column: Library & Mode Actions
+                            Column(
+                                modifier = Modifier.fillMaxHeight().width(50.dp),
+                                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+                            ) {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Default.Menu, contentDescription = "Open Tune List")
+                                }
+
+                                if (isCreatingNewTune) {
+                                    IconButton(onClick = { createNewFileLauncher.launch("new_tune.abc") }) {
+                                        Icon(Icons.Default.Save, contentDescription = "Save New")
+                                    }
+                                    IconButton(onClick = { showDiscardDialog = true }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Cancel")
+                                    }
+                                } else if (selectedTune != null) {
+                                    val hasChanges = abcContent != selectedTune?.content
+                                    IconButton(
+                                        onClick = { saveTune(selectedTune!!, abcContent) },
+                                        enabled = hasChanges
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Save,
+                                            contentDescription = "Save",
+                                            tint = if (hasChanges) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+                                    IconButton(onClick = { showDeleteDialog = true }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                IconButton(onClick = {
+                                    isPlaying = false
+                                    isPaused = false
+                                    showPreview = !showPreview
+                                }) {
+                                    Icon(
+                                        if (showPreview) Icons.Default.Edit else Icons.Default.Visibility,
+                                        contentDescription = if (showPreview) "Edit" else "View"
+                                    )
+                                }
+                            }
+
+                            // Right Column: Playback Actions & Tempo
+                            Column(
+                                modifier = Modifier.fillMaxHeight().width(50.dp),
+                                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+                            ) {
+                                if (!isCreatingNewTune && selectedTune != null) {
+                                    // Tempo Controls
+                                    IconButton(onClick = { 
+                                        tempo = (tempo + 5f).coerceAtMost(200f)
+                                        activeTempo = tempo
+                                    }) {
+                                        Icon(Icons.Default.Add, contentDescription = "Increase Tempo")
+                                    }
+                                    
+                                    Text(
+                                        text = tempo.toInt().toString(),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    )
+
+                                    IconButton(onClick = { 
+                                        tempo = (tempo - 5f).coerceAtLeast(40f)
+                                        activeTempo = tempo
+                                    }) {
+                                        Icon(Icons.Default.Remove, contentDescription = "Decrease Tempo")
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    IconButton(onClick = {
+                                        isPlaying = true
+                                        isPaused = false
+                                    }, enabled = !isPlaying || isPaused) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = "Play")
+                                    }
+                                    IconButton(onClick = {
+                                        isPaused = true
+                                    }, enabled = isPlaying && !isPaused) {
+                                        Icon(Icons.Default.Pause, contentDescription = "Pause")
+                                    }
+                                    IconButton(onClick = {
+                                        isPlaying = false
+                                        isPaused = false
+                                    }, enabled = isPlaying) {
+                                        Icon(Icons.Default.Stop, contentDescription = "Stop")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
                 if (showDiscardDialog) {
                     DiscardEditsDialog(
@@ -702,4 +951,3 @@ fun FolkMusicStudioApp() {
             }
         }
     }
-}
